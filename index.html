@@ -30,10 +30,13 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 #dashboard{display:none;position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:32px 20px 60px}
 
 /* NAV TABS */
-.nav-tabs{display:flex;gap:4px;margin-bottom:32px;border-bottom:1px solid var(--border);padding-bottom:0}
+.nav-tabs{display:flex;gap:4px;margin-bottom:32px;border-bottom:1px solid var(--border);padding-bottom:0;flex-wrap:wrap}
 .nav-tab{padding:10px 22px;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none}
 .nav-tab:hover{color:var(--text)}
 .nav-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+/* logout sits at the right */
+.nav-logout{margin-left:auto;padding:10px 18px;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--danger);cursor:pointer;background:none;border:1px solid var(--danger);margin-bottom:6px;transition:all .2s}
+.nav-logout:hover{background:rgba(255,68,68,.1)}
 
 /* TOPBAR */
 .topbar{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:32px}
@@ -65,6 +68,15 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .motor-label{font-weight:600;font-size:.95rem;color:#fff}
 .motor-sub{font-family:var(--font-mono);font-size:.68rem;color:var(--muted);margin-top:2px}
 
+/* LED LEGEND */
+.led-legend{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px;padding:12px 16px;background:var(--panel);border:1px solid var(--border)}
+.led-item{display:flex;align-items:center;gap:7px;font-family:var(--font-mono);font-size:.62rem;color:var(--muted)}
+.led-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.led-dot.blue{background:#00c9ff}.led-dot.red{background:#ff4444}.led-dot.green{background:#39ff8f}
+.led-dot.yellow{background:#ffb800}.led-dot.red-blink{background:#ff4444;animation:blink 1s infinite}
+.led-dot.yellow-blink{background:#ffb800;animation:blink .8s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+
 /* MOTOR INFO ROWS */
 .motor-info-rows{display:flex;gap:10px;margin-top:8px;flex-wrap:wrap}
 .motor-info-row{background:var(--panel);border:1px solid var(--border);padding:10px 16px;flex:1;min-width:160px;display:flex;flex-direction:column;gap:3px}
@@ -72,7 +84,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .motor-info-row .mir-val{font-family:var(--font-mono);font-size:.88rem;font-weight:700;color:var(--accent)}
 
 /* TANK */
-.tank-section{display:flex;gap:32px;align-items:flex-start;margin-top:14px;flex-wrap:wrap}
+.tank-section{display:flex;gap:32px;align-items:flex-start;margin-top:20px;flex-wrap:wrap}
 .tank-graphic-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;flex-shrink:0}
 .tank-graphic-label{font-family:var(--font-mono);font-size:.65rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
 .tank-shell{width:110px;height:200px;border:3px solid var(--border);border-radius:6px 6px 10px 10px;position:relative;overflow:hidden;background:#0a1410;box-shadow:inset 0 0 20px rgba(0,0,0,.5),0 0 0 1px #0d1f17}
@@ -147,7 +159,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .form-actions{display:flex;gap:10px;margin-top:16px}
 
 /* FOOTER */
-.footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--border);font-family:var(--font-mono);font-size:.65rem;color:var(--muted);display:flex;justify-content:space-between}
+.footer{margin-top:50px;padding-top:20px;border-top:1px solid var(--border);font-family:var(--font-mono);font-size:.65rem;color:var(--muted);display:flex;justify-content:space-between;flex-wrap:wrap;gap:6px}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 .s-card,.ctrl-panel,.motor-banner,.tank-shell,.tank-info-row,.chart-wrap,.form-card{animation:fadeUp .5s ease both}
@@ -160,8 +172,8 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
   <div class="login-card">
     <h2>🍄 Mushroom Farm</h2>
     <p class="sub">// secure device access terminal</p>
-    <div class="field"><label>Email</label><input type="email" id="email" placeholder="user@example.com"></div>
-    <div class="field"><label>Password</label><input type="password" id="password" placeholder="••••••••"></div>
+    <div class="field"><label>Email</label><input type="email" id="email" placeholder="user@example.com" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input type="password" id="password" placeholder="••••••••" autocomplete="current-password"></div>
     <button class="btn-primary" onclick="login()">Authenticate</button>
     <div id="loginError"></div>
   </div>
@@ -180,11 +192,12 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 
   <!-- NAV -->
   <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('live')">Live</button>
-    <button class="nav-tab" onclick="showPage('production')">Production Data</button>
-    <button class="nav-tab" onclick="showPage('batch')">Batch Info</button>
-    <button class="nav-tab" onclick="showPage('harvest')">Harvest Log</button>
-    <button class="nav-tab" onclick="showPage('settings')">Settings</button>
+    <button class="nav-tab active" data-page="live"       onclick="showPage(this,'live')">Live</button>
+    <button class="nav-tab"        data-page="production" onclick="showPage(this,'production')">Production Data</button>
+    <button class="nav-tab"        data-page="batch"      onclick="showPage(this,'batch')">Batch Info</button>
+    <button class="nav-tab"        data-page="harvest"    onclick="showPage(this,'harvest')">Harvest Log</button>
+    <button class="nav-tab"        data-page="settings"   onclick="showPage(this,'settings')">Settings</button>
+    <button class="nav-logout" onclick="logout()">⏻ Logout</button>
   </div>
 
   <!-- ══ PAGE: LIVE ══════════════════════════════════════ -->
@@ -214,8 +227,18 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <div class="motor-dot" id="motorDot"></div>
       <div>
         <div class="motor-label">Humidifier — <span id="motorLabel">--</span></div>
-        <div class="motor-sub">auto mode · relay active-low · pin 25</div>
+        <div class="motor-sub" id="motorModeLabel">auto mode · relay active-low · pin 25</div>
       </div>
+    </div>
+
+    <!-- LED Legend -->
+    <div class="led-legend">
+      <div class="led-item"><div class="led-dot blue"></div>Connecting WiFi</div>
+      <div class="led-item"><div class="led-dot red"></div>Auto — Idle</div>
+      <div class="led-item"><div class="led-dot green"></div>Auto — Running</div>
+      <div class="led-item"><div class="led-dot yellow"></div>Manual — OFF</div>
+      <div class="led-item"><div class="led-dot yellow-blink"></div>Manual — ON</div>
+      <div class="led-item"><div class="led-dot red-blink"></div>Tank Empty!</div>
     </div>
 
     <div class="motor-info-rows">
@@ -224,12 +247,12 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         <div class="mir-val" id="motorLastOn">--</div>
       </div>
       <div class="motor-info-row">
-        <div class="mir-label">Duration ON</div>
+        <div class="mir-label">Duration ON (current / last run)</div>
         <div class="mir-val" id="motorDuration">--</div>
       </div>
     </div>
 
-    <div class="tank-section" style="margin-top:20px;">
+    <div class="tank-section">
       <div class="tank-graphic-wrap">
         <div class="tank-graphic-label">Water Tank</div>
         <div style="position:relative;padding-right:90px;">
@@ -246,7 +269,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         <div class="tank-info-row"><div class="row-label">Low Sensor<span class="pin">Pin 32 — bottom</span></div><div class="row-val" id="info_tankLow">--</div></div>
         <div class="tank-info-row"><div class="row-label">Full Sensor<span class="pin">Pin 33 — top</span></div><div class="row-val" id="info_tankFull">--</div></div>
         <div class="tank-info-row"><div class="row-label">Tank Status</div><div class="row-val" id="info_tankStatus">--</div></div>
-        <div style="font-family:var(--font-mono);font-size:.62rem;color:var(--muted);padding:10px 4px;line-height:1.7;">YES = EMPTY at that sensor · NO = water present</div>
+        <div style="font-family:var(--font-mono);font-size:.62rem;color:var(--muted);padding:10px 4px;line-height:1.7;">HIGH = EMPTY at that sensor level · LOW = water present</div>
       </div>
     </div>
 
@@ -362,7 +385,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <div class="ctrl-panel">
         <h3>Motor Override</h3>
         <div class="motor-btns">
-          <button class="btn-on" onclick="motorOn()">ON</button>
+          <button class="btn-on"  onclick="motorOn()">ON</button>
           <button class="btn-off" onclick="motorOff()">OFF</button>
           <button class="btn-auto" onclick="motorAuto()">Auto</button>
         </div>
@@ -391,7 +414,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
           </div>
           <div class="inp-group">
             <label>Min Off (s)</label>
-            <input type="number" id="inp_minOff" placeholder="120" min="1" step="1">
+            <input type="number" id="inp_minOff" placeholder="180" min="1" step="1">
             <p class="inp-desc">Motor must rest at least this long between cycles.</p>
           </div>
         </div>
@@ -431,7 +454,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.database();
 
-/* ── LOGIN ── */
+/* ── LOGIN / LOGOUT ── */
 function login() {
   const email = document.getElementById("email").value.trim();
   const pass  = document.getElementById("password").value;
@@ -440,8 +463,22 @@ function login() {
     .catch(e => { document.getElementById("loginError").innerText = e.message; });
 }
 
+function logout() {
+  if (!confirm("Log out?")) return;
+  // detach all listeners before signing out to avoid permission errors
+  db.ref("esp32").off();
+  auth.signOut().then(() => {
+    document.getElementById("dashboard").style.display = "none";
+    document.getElementById("loginBox").style.display  = "flex";
+    document.getElementById("email").value    = "";
+    document.getElementById("password").value = "";
+    // destroy charts so they can be recreated on next login
+    destroyCharts();
+  });
+}
+
 auth.onAuthStateChanged(user => {
-  if(user) {
+  if (user) {
     document.getElementById("loginBox").style.display  = "none";
     document.getElementById("dashboard").style.display = "block";
     startListeners();
@@ -453,27 +490,26 @@ auth.onAuthStateChanged(user => {
 });
 
 /* ── MOTOR ON TRACKING ── */
-let motorOnSince = null;
+let motorOnSince      = null;
 let motorDurationTimer = null;
 
 function formatDuration(ms) {
-  if(ms < 0) ms = 0;
-  const totalSec = Math.floor(ms / 1000);
-  const h = Math.floor(totalSec / 3600);
-  const m = Math.floor((totalSec % 3600) / 60);
-  const s = totalSec % 60;
-  if(h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(s).padStart(2,'0')}s`;
-  if(m > 0) return `${m}m ${String(s).padStart(2,'0')}s`;
-  return `${s}s`;
+  if (ms < 0) ms = 0;
+  const s = Math.floor(ms / 1000);
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
+  if (m > 0) return `${m}m ${String(sec).padStart(2,'0')}s`;
+  return `${sec}s`;
 }
 
 function startDurationTick() {
   clearInterval(motorDurationTimer);
   motorDurationTimer = setInterval(() => {
-    if(motorOnSince !== null) {
-      const elapsed = Date.now() - motorOnSince;
-      document.getElementById("motorDuration").innerText = formatDuration(elapsed);
-    }
+    if (motorOnSince !== null)
+      document.getElementById("motorDuration").innerText =
+        formatDuration(Date.now() - motorOnSince);
   }, 1000);
 }
 
@@ -486,35 +522,57 @@ function stopDurationTick() {
 let tankLowVal = false, tankFullVal = false;
 
 function updateTankGraphic() {
-  let fillPct=10, statusText="--", badgeClass="", lowClass="ok", fullClass="ok", statusClass="";
-  const lowText  = tankLowVal  ? "EMPTY at sensor" : "Water present";
-  const fullText = tankFullVal ? "EMPTY at sensor" : "Water present";
+  /* ESP32: LOW pin HIGH = no water at bottom → tankLow = true  (empty)
+            FULL pin HIGH = no water at top   → tankFull = true (not full) */
+  let fillPct, statusText, badgeClass, statusClass;
+
+  if (!tankLowVal && !tankFullVal)     { fillPct = 95; statusText = "TANK FULL";    badgeClass = "full";  statusClass = "full";  }
+  else if (!tankLowVal && tankFullVal) { fillPct = 50; statusText = "MID LEVEL";    badgeClass = "ok";    statusClass = "ok";    }
+  else if ( tankLowVal && tankFullVal) { fillPct =  5; statusText = "⚠ EMPTY";      badgeClass = "empty"; statusClass = "empty"; }
+  else                                  { fillPct = 10; statusText = "SENSOR FAULT"; badgeClass = "low";   statusClass = "low";   }
+
+  document.getElementById("tankWater").style.height = fillPct + "%";
+
+  const badge = document.getElementById("tankBadge");
+  badge.className = "tank-status-badge " + badgeClass;
+  badge.innerText  = statusText;
+
+  const lowText  = tankLowVal  ? "HIGH (empty at sensor)" : "LOW (water present)";
+  const fullText = tankFullVal ? "HIGH (empty at sensor)" : "LOW (water present)";
   const lc = tankLowVal  ? "empty" : "ok";
   const fc = tankFullVal ? "empty" : "full";
 
-  if(!tankLowVal && !tankFullVal)      { fillPct=95; statusText="TANK FULL";    badgeClass="full";  statusClass="full"; }
-  else if(!tankLowVal && tankFullVal)  { fillPct=50; statusText="MID LEVEL";    badgeClass="ok";    statusClass="ok"; }
-  else if(tankLowVal  && tankFullVal)  { fillPct=5;  statusText="⚠ EMPTY";      badgeClass="empty"; statusClass="empty"; }
-  else                                  { fillPct=10; statusText="SENSOR FAULT"; badgeClass="low";   statusClass="low"; }
-
-  document.getElementById("tankWater").style.height = fillPct + "%";
-  const badge = document.getElementById("tankBadge");
-  badge.className = "tank-status-badge " + badgeClass;
-  badge.innerText = statusText;
-  const il = document.getElementById("info_tankLow");   il.innerText = lowText;  il.className = "row-val " + lc;
-  const iF = document.getElementById("info_tankFull");  iF.innerText = fullText; iF.className = "row-val " + fc;
-  const is = document.getElementById("info_tankStatus");is.innerText = statusText;is.className = "row-val " + statusClass;
+  const il = document.getElementById("info_tankLow");    il.innerText = lowText;    il.className = "row-val " + lc;
+  const iF = document.getElementById("info_tankFull");   iF.innerText = fullText;   iF.className = "row-val " + fc;
+  const is = document.getElementById("info_tankStatus"); is.innerText = statusText; is.className = "row-val " + statusClass;
 }
 
 /* ── LIVE LISTENERS ── */
 function startListeners() {
-  db.ref("esp32/SHT30/Temperature").on("value", s => { const v=s.val(); setText("val_tempIn",  v!==null?v.toFixed(1):"--"); flagCard("card_tempIn",v,15,35); markUpdate(); });
-  db.ref("esp32/SHT30/Humidity").on("value",    s => { const v=s.val(); setText("val_humIn",   v!==null?v.toFixed(1):"--"); flagCard("card_humIn",v,80,95);  markUpdate(); });
-  db.ref("esp32/SHT30_Outside/Temperature").on("value", s => { const v=s.val(); setText("val_tempOut", v!==null?v.toFixed(1):"--"); flagCard("card_tempOut",v,10,40); });
-  db.ref("esp32/SHT30_Outside/Humidity").on("value",    s => { const v=s.val(); setText("val_humOut",  v!==null?v.toFixed(1):"--"); });
-  db.ref("esp32/LUX").on("value",           s => { const v=s.val(); setText("val_lux",   v!==null?Math.round(v):"--"); });
-  db.ref("esp32/MQ135/Inside").on("value",  s => setText("val_mqIn",  s.val()!==null?s.val():"--"));
-  db.ref("esp32/MQ135/Outside").on("value", s => setText("val_mqOut", s.val()!==null?s.val():"--"));
+  db.ref("esp32/SHT30/Temperature").on("value", s => {
+    const v = s.val();
+    setText("val_tempIn", v !== null ? v.toFixed(1) : "--");
+    flagCard("card_tempIn", v, 15, 35);
+    markUpdate();
+  });
+  db.ref("esp32/SHT30/Humidity").on("value", s => {
+    const v = s.val();
+    setText("val_humIn", v !== null ? v.toFixed(1) : "--");
+    flagCard("card_humIn", v, 80, 95);
+    markUpdate();
+  });
+  db.ref("esp32/SHT30_Outside/Temperature").on("value", s => {
+    const v = s.val();
+    setText("val_tempOut", v !== null ? v.toFixed(1) : "--");
+    flagCard("card_tempOut", v, 10, 40);
+  });
+  db.ref("esp32/SHT30_Outside/Humidity").on("value", s => {
+    const v = s.val();
+    setText("val_humOut", v !== null ? v.toFixed(1) : "--");
+  });
+  db.ref("esp32/LUX").on("value",          s => setText("val_lux",   s.val() !== null ? Math.round(s.val()) : "--"));
+  db.ref("esp32/MQ135/Inside").on("value", s => setText("val_mqIn",  s.val() !== null ? s.val() : "--"));
+  db.ref("esp32/MQ135/Outside").on("value",s => setText("val_mqOut", s.val() !== null ? s.val() : "--"));
 
   db.ref("esp32/Tank/Low").on("value",  s => { tankLowVal  = !!s.val(); updateTankGraphic(); });
   db.ref("esp32/Tank/Full").on("value", s => { tankFullVal = !!s.val(); updateTankGraphic(); });
@@ -524,8 +582,21 @@ function startListeners() {
     document.getElementById("motorLabel").innerText = on ? "RUNNING" : "IDLE";
     document.getElementById("motorDot").classList.toggle("on", on);
 
-    if(on) {
-      if(motorOnSince === null) {
+    // Update mode label based on current override state
+    db.ref("esp32/control/manual_override").once("value", ms => {
+      const override = !!ms.val();
+      if (override) {
+        document.getElementById("motorModeLabel").innerText =
+          on ? "🟡 manual override · ON" : "🟡 manual override · OFF";
+      } else if (tankLowVal) {
+        document.getElementById("motorModeLabel").innerText = "⚠ tank empty — motor locked OFF";
+      } else {
+        document.getElementById("motorModeLabel").innerText = "auto mode · relay active-low · pin 25";
+      }
+    });
+
+    if (on) {
+      if (motorOnSince === null) {
         motorOnSince = Date.now();
         const now = new Date();
         document.getElementById("motorLastOn").innerText =
@@ -534,47 +605,66 @@ function startListeners() {
         startDurationTick();
       }
     } else {
-      if(motorOnSince !== null) {
+      if (motorOnSince !== null) {
         const elapsed = Date.now() - motorOnSince;
-        document.getElementById("motorDuration").innerText = formatDuration(elapsed) + " (last run)";
+        document.getElementById("motorDuration").innerText =
+          formatDuration(elapsed) + " (last run)";
         motorOnSince = null;
         stopDurationTick();
       }
     }
   });
 
-  db.ref("esp32/heartbeat").on("value", s => { if(s.val()!==null){ setWifi(true); resetHeartbeatTimer(); } });
+  db.ref("esp32/heartbeat").on("value", s => {
+    if (s.val() !== null) { setWifi(true); resetHeartbeatTimer(); }
+  });
 
-  /* pre-fill settings inputs */
-  db.ref("esp32/control/humidity_low").once("value",  s => { if(s.val()!==null) document.getElementById("inp_humLow").value  = s.val(); });
-  db.ref("esp32/control/humidity_high").once("value", s => { if(s.val()!==null) document.getElementById("inp_humHigh").value = s.val(); });
-  db.ref("esp32/control/min_run_time").once("value",  s => { if(s.val()!==null) document.getElementById("inp_minRun").value  = s.val(); });
-  db.ref("esp32/control/min_off_time").once("value",  s => { if(s.val()!==null) document.getElementById("inp_minOff").value  = s.val(); });
-  db.ref("esp32/control/max_run_time").once("value",  s => { if(s.val()!==null) document.getElementById("inp_maxRun").value  = s.val(); });
+  /* Pre-fill settings inputs */
+  db.ref("esp32/control/humidity_low").once("value",  s => { if (s.val() !== null) document.getElementById("inp_humLow").value  = s.val(); });
+  db.ref("esp32/control/humidity_high").once("value", s => { if (s.val() !== null) document.getElementById("inp_humHigh").value = s.val(); });
+  db.ref("esp32/control/min_run_time").once("value",  s => { if (s.val() !== null) document.getElementById("inp_minRun").value  = s.val(); });
+  db.ref("esp32/control/min_off_time").once("value",  s => { if (s.val() !== null) document.getElementById("inp_minOff").value  = s.val(); });
+  db.ref("esp32/control/max_run_time").once("value",  s => { if (s.val() !== null) document.getElementById("inp_maxRun").value  = s.val(); });
 }
 
 /* ── CHARTS ── */
-let chartTemp=null, chartHum=null, chartMQ=null, chartLux=null;
+let chartTemp = null, chartHum = null, chartMQ = null, chartLux = null;
+let chartsInited = false;
 
 const chartDefaults = {
-  responsive:true,
-  plugins:{ legend:{ labels:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:11 } } } },
-  scales:{
-    x:{ ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } }, grid:{ color:'#1e3327' } },
-    y:{ ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } }, grid:{ color:'#1e3327' } }
+  responsive: true,
+  plugins: { legend: { labels: { color:'#4a7a5a', font:{ family:'Share Tech Mono', size:11 } } } },
+  scales: {
+    x: { ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } }, grid:{ color:'#1e3327' } },
+    y: { ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } }, grid:{ color:'#1e3327' } }
   }
 };
 
 function makeChart(id, datasets) {
   const ctx = document.getElementById(id).getContext("2d");
-  return new Chart(ctx, { type:'line', data:{ labels:[], datasets }, options: JSON.parse(JSON.stringify(chartDefaults)) });
+  return new Chart(ctx, {
+    type: 'line',
+    data: { labels:[], datasets },
+    options: JSON.parse(JSON.stringify(chartDefaults))
+  });
+}
+
+/* FIX: destroy charts before re-creating to avoid canvas reuse error */
+function destroyCharts() {
+  if (chartTemp) { chartTemp.destroy(); chartTemp = null; }
+  if (chartHum)  { chartHum.destroy();  chartHum  = null; }
+  if (chartMQ)   { chartMQ.destroy();   chartMQ   = null; }
+  if (chartLux)  { chartLux.destroy();  chartLux  = null; }
+  chartsInited = false;
 }
 
 function initCharts() {
-  if(chartTemp) return;
+  if (chartsInited) return;
+  chartsInited = true;
+
   chartTemp = makeChart("chartTemp", [
-    { label:"Inside °C",  data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.08)", tension:.3, pointRadius:3 },
-    { label:"Outside °C", data:[], borderColor:"#ffb800", backgroundColor:"rgba(255,184,0,.05)",  tension:.3, pointRadius:3 }
+    { label:"Inside °C",  data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.08)",  tension:.3, pointRadius:3 },
+    { label:"Outside °C", data:[], borderColor:"#ffb800", backgroundColor:"rgba(255,184,0,.05)",   tension:.3, pointRadius:3 }
   ]);
   chartHum = makeChart("chartHum", [
     { label:"Inside % RH",  data:[], borderColor:"#00c9ff", backgroundColor:"rgba(0,201,255,.08)", tension:.3, pointRadius:3 },
@@ -585,23 +675,26 @@ function initCharts() {
     { label:"MQ135 Outside", data:[], borderColor:"#ffa07a", backgroundColor:"rgba(255,160,122,.05)", tension:.3, pointRadius:3 }
   ]);
   chartLux = makeChart("chartLux", [
-    { label:"Lux",            data:[], borderColor:"#f9ca24", backgroundColor:"rgba(249,202,36,.08)",  tension:.3, pointRadius:3, yAxisID:'y' },
-    { label:"Motor ON (s)",   data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.06)",  tension:.3, pointRadius:3, yAxisID:'y1', borderDash:[5,3] }
+    { label:"Lux",          data:[], borderColor:"#f9ca24", backgroundColor:"rgba(249,202,36,.08)", tension:.3, pointRadius:3, yAxisID:'y'  },
+    { label:"Motor ON (s)", data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.06)", tension:.3, pointRadius:3, yAxisID:'y1', borderDash:[5,3] }
   ]);
-  chartLux.options.scales.y1 = { type:'linear', position:'right', ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } }, grid:{ drawOnChartArea:false } };
+  chartLux.options.scales.y1 = {
+    type:'linear', position:'right',
+    ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } },
+    grid:{ drawOnChartArea:false }
+  };
   chartLux.update();
 }
 
 function loadChartData() {
   const dateStr = document.getElementById("chartDate").value;
-  if(!dateStr) { alert("Select a date first"); return; }
+  if (!dateStr) { alert("Select a date first"); return; }
 
   db.ref("esp32/logs/" + dateStr).once("value", snap => {
-    if(!snap.exists()) { alert("No data for " + dateStr); return; }
+    if (!snap.exists()) { alert("No data for " + dateStr); return; }
 
-    const raw = snap.val();
+    const raw  = snap.val();
     const keys = Object.keys(raw).sort();
-
     const labels=[], tIn=[], tOut=[], hIn=[], hOut=[], mqIn=[], mqOut=[], luxArr=[], motorArr=[];
 
     keys.forEach(k => {
@@ -633,8 +726,6 @@ function loadChartData() {
 /* ══════════════════════════════════════════════════════════
    EXCEL EXPORT HELPERS
    ══════════════════════════════════════════════════════════ */
-
-/* Download a workbook as .xlsx */
 function downloadXLSX(wb, filename) {
   const wbout = XLSX.write(wb, { bookType:"xlsx", type:"array" });
   const blob  = new Blob([wbout], { type:"application/octet-stream" });
@@ -647,62 +738,56 @@ function downloadXLSX(wb, filename) {
   setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
 }
 
-/* Style a header row bold with green background */
 function styleHeader(ws, numCols) {
-  const headerStyle = { font:{ bold:true, color:{ rgb:"0A0F0D" } }, fill:{ fgColor:{ rgb:"39FF8F" } }, alignment:{ horizontal:"center" } };
-  for(let c = 0; c < numCols; c++) {
+  const headerStyle = {
+    font:{ bold:true, color:{ rgb:"0A0F0D" } },
+    fill:{ fgColor:{ rgb:"39FF8F" } },
+    alignment:{ horizontal:"center" }
+  };
+  for (let c = 0; c < numCols; c++) {
     const cell = ws[XLSX.utils.encode_cell({ r:0, c })];
-    if(cell) cell.s = headerStyle;
+    if (cell) cell.s = headerStyle;
   }
 }
 
-/* Build production rows from Firebase snapshot for a single date */
 function buildProductionRows(dateStr, raw) {
   const rows = [["Timestamp","Temp Inside (°C)","Humidity Inside (%)","Temp Outside (°C)","Humidity Outside (%)","Light (lux)","MQ135 Inside (ADC)","MQ135 Outside (ADC)","Humidifier ON (sec)"]];
   Object.keys(raw).sort().forEach(k => {
     const r = raw[k];
     rows.push([
       dateStr + " " + k.replace("-",":"),
-      r.tempIn??'', r.humIn??'', r.tempOut??'', r.humOut??'',
-      r.lux??'', r.mqIn??'', r.mqOut??'', r.motorOnS??0
+      r.tempIn ?? '', r.humIn ?? '', r.tempOut ?? '', r.humOut ?? '',
+      r.lux ?? '', r.mqIn ?? '', r.mqOut ?? '', r.motorOnS ?? 0
     ]);
   });
   return rows;
 }
 
-/* ── EXPORT: SINGLE DAY ── */
 function exportDayExcel() {
   const dateStr = document.getElementById("chartDate").value;
-  if(!dateStr) { alert("Select a date first"); return; }
-
+  if (!dateStr) { alert("Select a date first"); return; }
   db.ref("esp32/logs/" + dateStr).once("value", snap => {
-    if(!snap.exists()) { alert("No production data for " + dateStr); return; }
-
+    if (!snap.exists()) { alert("No production data for " + dateStr); return; }
     const rows = buildProductionRows(dateStr, snap.val());
     const ws   = XLSX.utils.aoa_to_sheet(rows);
     ws["!cols"] = [20,18,20,20,22,14,20,20,20].map(w => ({ wch:w }));
     styleHeader(ws, rows[0].length);
-
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Production " + dateStr);
     downloadXLSX(wb, "production_" + dateStr + ".xlsx");
   });
 }
 
-/* ── EXPORT: FULL ALL-DATA WORKBOOK (3 sheets) ── */
 function exportFullExcel() {
   const dateStr = document.getElementById("chartDate").value;
-
   Promise.all([
     dateStr ? db.ref("esp32/logs/" + dateStr).once("value") : Promise.resolve(null),
     db.ref("farm/batches").once("value"),
     db.ref("farm/harvests").once("value")
   ]).then(([prodSnap, batchSnap, harvestSnap]) => {
-
     const wb = XLSX.utils.book_new();
 
-    /* ── Sheet 1: Production ── */
-    if(prodSnap && prodSnap.exists()) {
+    if (prodSnap && prodSnap.exists()) {
       const rows = buildProductionRows(dateStr, prodSnap.val());
       const ws   = XLSX.utils.aoa_to_sheet(rows);
       ws["!cols"] = [20,18,20,20,22,14,20,20,20].map(w => ({ wch:w }));
@@ -713,11 +798,10 @@ function exportFullExcel() {
       XLSX.utils.book_append_sheet(wb, ws, "Production");
     }
 
-    /* ── Sheet 2: Batch Info ── */
     const batchRows = [["Batch ID","Spawn Type","Substrate","Spawn Date","No. of Bags","Notes"]];
-    if(batchSnap && batchSnap.exists()) {
+    if (batchSnap && batchSnap.exists()) {
       Object.values(batchSnap.val())
-        .sort((a,b) => (a.date??'').localeCompare(b.date??''))
+        .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
         .forEach(r => batchRows.push([r.id, r.spawn, r.substrate, r.date, r.bags, r.notes||'']));
     }
     const wsBatch = XLSX.utils.aoa_to_sheet(batchRows);
@@ -725,11 +809,10 @@ function exportFullExcel() {
     styleHeader(wsBatch, batchRows[0].length);
     XLSX.utils.book_append_sheet(wb, wsBatch, "Batch Info");
 
-    /* ── Sheet 3: Harvest Log ── */
     const harvestRows = [["Batch ID","Flush No.","Harvest Date","Yield (g)","Notes"]];
-    if(harvestSnap && harvestSnap.exists()) {
+    if (harvestSnap && harvestSnap.exists()) {
       Object.values(harvestSnap.val())
-        .sort((a,b) => (a.date??'').localeCompare(b.date??''))
+        .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
         .forEach(r => harvestRows.push([r.batchId, "Flush " + r.flush, r.date, r.yield_g, r.notes||'']));
     }
     const wsHarvest = XLSX.utils.aoa_to_sheet(harvestRows);
@@ -751,39 +834,41 @@ function saveBatch() {
   const bags      = parseInt(document.getElementById("b_bags").value);
   const notes     = document.getElementById("b_notes").value.trim();
 
-  if(!id||!spawn||!substrate||!date||isNaN(bags)) { showMsg("batchMsg","Fill all required fields"); return; }
+  if (!id || !spawn || !substrate || !date || isNaN(bags)) {
+    showMsg("batchMsg", "✗ Fill all required fields"); return;
+  }
 
   const record = { id, spawn, substrate, date, bags, notes, createdAt: new Date().toISOString() };
-
   db.ref("farm/batches/" + id).set(record)
     .then(() => {
-      showMsg("batchMsg","✓ Batch " + id + " saved");
-      ["b_id","b_spawn","b_substrate","b_date","b_bags","b_notes"].forEach(f => document.getElementById(f).value="");
+      showMsg("batchMsg", "✓ Batch " + id + " saved");
+      ["b_id","b_spawn","b_substrate","b_date","b_bags","b_notes"].forEach(f => document.getElementById(f).value = "");
       loadBatchTable();
     })
-    .catch(err => showMsg("batchMsg","✗ " + err.message));
+    .catch(err => showMsg("batchMsg", "✗ " + err.message));
 }
 
 function loadBatchTable() {
   db.ref("farm/batches").once("value", snap => {
     const tbody = document.getElementById("batchTableBody");
     tbody.innerHTML = "";
-    if(!snap.exists()) return;
-    Object.values(snap.val()).sort((a,b)=>b.createdAt?.localeCompare(a.createdAt??'')??0).forEach(r => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td><span class="badge badge-spawn">${r.id}</span></td><td>${r.spawn}</td><td>${r.substrate}</td><td>${r.date}</td><td>${r.bags}</td><td>${r.notes||'—'}</td>`;
-      tbody.appendChild(tr);
-    });
+    if (!snap.exists()) return;
+    Object.values(snap.val())
+      .sort((a,b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+      .forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td><span class="badge badge-spawn">${r.id}</span></td><td>${r.spawn}</td><td>${r.substrate}</td><td>${r.date}</td><td>${r.bags}</td><td>${r.notes||'—'}</td>`;
+        tbody.appendChild(tr);
+      });
   });
 }
 
-/* ── EXPORT: BATCH ONLY ── */
 function exportBatchCSV() {
   db.ref("farm/batches").once("value", snap => {
-    if(!snap.exists()) { alert("No batch records found"); return; }
+    if (!snap.exists()) { alert("No batch records found"); return; }
     const rows = [["Batch ID","Spawn Type","Substrate","Spawn Date","No. of Bags","Notes"]];
     Object.values(snap.val())
-      .sort((a,b) => (a.date??'').localeCompare(b.date??''))
+      .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
       .forEach(r => rows.push([r.id, r.spawn, r.substrate, r.date, r.bags, r.notes||'']));
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws["!cols"] = [14,16,16,14,12,30].map(w => ({ wch:w }));
@@ -802,40 +887,42 @@ function saveHarvest() {
   const yield_g = parseFloat(document.getElementById("h_yield").value);
   const notes   = document.getElementById("h_notes").value.trim();
 
-  if(!batchId||isNaN(flush)||!date||isNaN(yield_g)) { showMsg("harvestMsg","Fill all required fields"); return; }
+  if (!batchId || isNaN(flush) || !date || isNaN(yield_g)) {
+    showMsg("harvestMsg", "✗ Fill all required fields"); return;
+  }
 
   const key    = batchId + "_F" + flush;
   const record = { batchId, flush, date, yield_g, notes, createdAt: new Date().toISOString() };
-
   db.ref("farm/harvests/" + key).set(record)
     .then(() => {
-      showMsg("harvestMsg","✓ Harvest saved");
-      ["h_batchId","h_flush","h_date","h_yield","h_notes"].forEach(f => document.getElementById(f).value="");
+      showMsg("harvestMsg", "✓ Harvest saved");
+      ["h_batchId","h_flush","h_date","h_yield","h_notes"].forEach(f => document.getElementById(f).value = "");
       loadHarvestTable();
     })
-    .catch(err => showMsg("harvestMsg","✗ " + err.message));
+    .catch(err => showMsg("harvestMsg", "✗ " + err.message));
 }
 
 function loadHarvestTable() {
   db.ref("farm/harvests").once("value", snap => {
     const tbody = document.getElementById("harvestTableBody");
     tbody.innerHTML = "";
-    if(!snap.exists()) return;
-    Object.values(snap.val()).sort((a,b)=>b.date?.localeCompare(a.date??'')??0).forEach(r => {
-      const tr = document.createElement("tr");
-      tr.innerHTML = `<td><span class="badge badge-harvest">${r.batchId}</span></td><td>Flush ${r.flush}</td><td>${r.date}</td><td>${r.yield_g} g</td><td>${r.notes||'—'}</td>`;
-      tbody.appendChild(tr);
-    });
+    if (!snap.exists()) return;
+    Object.values(snap.val())
+      .sort((a,b) => (b.date ?? '').localeCompare(a.date ?? ''))
+      .forEach(r => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td><span class="badge badge-harvest">${r.batchId}</span></td><td>Flush ${r.flush}</td><td>${r.date}</td><td>${r.yield_g} g</td><td>${r.notes||'—'}</td>`;
+        tbody.appendChild(tr);
+      });
   });
 }
 
-/* ── EXPORT: HARVEST ONLY ── */
 function exportHarvestCSV() {
   db.ref("farm/harvests").once("value", snap => {
-    if(!snap.exists()) { alert("No harvest records found"); return; }
+    if (!snap.exists()) { alert("No harvest records found"); return; }
     const rows = [["Batch ID","Flush No.","Harvest Date","Yield (g)","Notes"]];
     Object.values(snap.val())
-      .sort((a,b) => (a.date??'').localeCompare(b.date??''))
+      .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
       .forEach(r => rows.push([r.batchId, "Flush " + r.flush, r.date, r.yield_g, r.notes||'']));
     const ws = XLSX.utils.aoa_to_sheet(rows);
     ws["!cols"] = [14,12,14,12,30].map(w => ({ wch:w }));
@@ -847,80 +934,110 @@ function exportHarvestCSV() {
 }
 
 /* ── CONTROLS ── */
-function motorOn()   { db.ref("esp32/control").update({ manual_override:true,  manual_state:true  }); showMsg("ctrlMsg","Override → ON sent"); }
-function motorOff()  { db.ref("esp32/control").update({ manual_override:true,  manual_state:false }); showMsg("ctrlMsg","Override → OFF sent"); }
-function motorAuto() { db.ref("esp32/control").update({ manual_override:false, manual_state:false }); showMsg("ctrlMsg","Auto mode restored"); }
+function motorOn() {
+  db.ref("esp32/control").update({ manual_override:true, manual_state:true });
+  showMsg("ctrlMsg","Override → ON sent");
+}
+function motorOff() {
+  db.ref("esp32/control").update({ manual_override:true, manual_state:false });
+  showMsg("ctrlMsg","Override → OFF sent");
+}
+function motorAuto() {
+  db.ref("esp32/control").update({ manual_override:false, manual_state:false });
+  showMsg("ctrlMsg","Auto mode restored");
+}
 
 function updateLimits() {
-  const low=parseFloat(document.getElementById("inp_humLow").value), high=parseFloat(document.getElementById("inp_humHigh").value);
-  if(isNaN(low)||isNaN(high)){ showMsg("limMsg","Enter valid numbers"); return; }
-  if(low>=high){ showMsg("limMsg","Low must be < High"); return; }
-  if(low<10||high>99){ showMsg("limMsg","Values 10–99%"); return; }
-  Promise.all([db.ref("esp32/control/humidity_low").set(low), db.ref("esp32/control/humidity_high").set(high)])
-    .then(()=>showMsg("limMsg",`✓ ${low}% – ${high}%`)).catch(e=>showMsg("limMsg","✗ "+e.message));
+  const low  = parseFloat(document.getElementById("inp_humLow").value);
+  const high = parseFloat(document.getElementById("inp_humHigh").value);
+  if (isNaN(low) || isNaN(high))     { showMsg("limMsg","Enter valid numbers"); return; }
+  if (low >= high)                    { showMsg("limMsg","Low must be < High");  return; }
+  if (low < 10 || high > 99)         { showMsg("limMsg","Values 10–99%");        return; }
+  Promise.all([
+    db.ref("esp32/control/humidity_low").set(low),
+    db.ref("esp32/control/humidity_high").set(high)
+  ]).then(() => showMsg("limMsg", `✓ ${low}% – ${high}%`))
+    .catch(e  => showMsg("limMsg", "✗ " + e.message));
 }
 
 function updateTiming() {
-  const r=parseInt(document.getElementById("inp_minRun").value), o=parseInt(document.getElementById("inp_minOff").value);
-  if(isNaN(r)||isNaN(o)||r<1||o<1){ showMsg("timMsg","Invalid values"); return; }
-  Promise.all([db.ref("esp32/control/min_run_time").set(r), db.ref("esp32/control/min_off_time").set(o)])
-    .then(()=>showMsg("timMsg",`✓ Run ${r}s · Off ${o}s`)).catch(e=>showMsg("timMsg","✗ "+e.message));
+  const r = parseInt(document.getElementById("inp_minRun").value);
+  const o = parseInt(document.getElementById("inp_minOff").value);
+  if (isNaN(r) || isNaN(o) || r < 1 || o < 1) { showMsg("timMsg","Invalid values"); return; }
+  Promise.all([
+    db.ref("esp32/control/min_run_time").set(r),
+    db.ref("esp32/control/min_off_time").set(o)
+  ]).then(() => showMsg("timMsg", `✓ Run ${r}s · Off ${o}s`))
+    .catch(e  => showMsg("timMsg", "✗ " + e.message));
 }
 
 function updateMaxRun() {
-  const v=parseInt(document.getElementById("inp_maxRun").value);
-  if(isNaN(v)||v<10){ showMsg("maxMsg","Min 10s"); return; }
-  db.ref("esp32/control/max_run_time").set(v).then(()=>showMsg("maxMsg",`✓ Cutoff ${v}s`)).catch(e=>showMsg("maxMsg","✗ "+e.message));
+  const v = parseInt(document.getElementById("inp_maxRun").value);
+  if (isNaN(v) || v < 10) { showMsg("maxMsg","Min 10s"); return; }
+  db.ref("esp32/control/max_run_time").set(v)
+    .then(() => showMsg("maxMsg", `✓ Cutoff ${v}s`))
+    .catch(e  => showMsg("maxMsg", "✗ " + e.message));
 }
 
-/* ── NAV ── */
-function showPage(name) {
+/* ── NAV  FIX: pass button ref explicitly so event.target quirks don't matter ── */
+function showPage(btn, name) {
   document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
   document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
   document.getElementById("page-" + name).classList.add("active");
-  event.target.classList.add("active");
-  if(name === "production") {
+  btn.classList.add("active");
+
+  if (name === "production") {
     initCharts();
-    if(document.getElementById("chartDate").value) loadChartData();
+    if (document.getElementById("chartDate").value) loadChartData();
   }
-  if(name === "batch")   loadBatchTable();
-  if(name === "harvest") loadHarvestTable();
+  if (name === "batch")   loadBatchTable();
+  if (name === "harvest") loadHarvestTable();
 }
 
 /* ── HELPERS ── */
-function setText(id,val){ document.getElementById(id).innerText=val; }
+function setText(id, val) { document.getElementById(id).innerText = val; }
 
-function flagCard(id,val,warn,danger) {
-  const el=document.getElementById(id);
+function flagCard(id, val, warn, danger) {
+  const el = document.getElementById(id);
   el.classList.remove("warn","alert");
-  if(val===null)return;
-  if(val>danger||val<(warn-10)) el.classList.add("alert");
-  else if(val>warn) el.classList.add("warn");
+  if (val === null) return;
+  if (val > danger || val < (warn - 10)) el.classList.add("alert");
+  else if (val > warn)                    el.classList.add("warn");
 }
 
-function showMsg(id,text) {
-  const el=document.getElementById(id);
-  el.innerText=text; el.classList.add("show");
+function showMsg(id, text) {
+  const el = document.getElementById(id);
+  el.innerText = text;
+  el.classList.add("show");
   clearTimeout(el._t);
-  el._t=setTimeout(()=>el.classList.remove("show"),3500);
+  el._t = setTimeout(() => el.classList.remove("show"), 3500);
 }
 
-function markUpdate(){ document.getElementById("lastUpdate").innerText=new Date().toLocaleTimeString(); }
+function markUpdate() {
+  document.getElementById("lastUpdate").innerText = new Date().toLocaleTimeString();
+}
 
-let heartbeatTimer=null;
-function resetHeartbeatTimer(){ clearTimeout(heartbeatTimer); heartbeatTimer=setTimeout(()=>setWifi(false),25000); }
-function setWifi(on){ document.getElementById("wifiStatus").className=on?"online":""; document.getElementById("wifiLabel").innerText=on?"online":"offline"; }
+let heartbeatTimer = null;
+function resetHeartbeatTimer() {
+  clearTimeout(heartbeatTimer);
+  heartbeatTimer = setTimeout(() => setWifi(false), 25000);
+}
+function setWifi(on) {
+  document.getElementById("wifiStatus").className = on ? "online" : "";
+  document.getElementById("wifiLabel").innerText  = on ? "online" : "offline";
+}
 
-function clockTick(){ document.getElementById("footerTime").innerText=new Date().toLocaleString(); setTimeout(clockTick,1000); }
+function clockTick() {
+  document.getElementById("footerTime").innerText = new Date().toLocaleString();
+  setTimeout(clockTick, 1000);
+}
 
-function setTodayDate(){
+function setTodayDate() {
   const today = new Date().toISOString().split("T")[0];
   document.getElementById("chartDate").value = today;
   document.getElementById("b_date").value    = today;
   document.getElementById("h_date").value    = today;
 }
-
-
 </script>
 </body>
 </html>
