@@ -34,7 +34,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .nav-tab{padding:10px 22px;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .2s;background:none;border-top:none;border-left:none;border-right:none}
 .nav-tab:hover{color:var(--text)}
 .nav-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-/* logout sits at the right */
 .nav-logout{margin-left:auto;padding:10px 18px;font-family:var(--font-mono);font-size:.68rem;letter-spacing:.15em;text-transform:uppercase;color:var(--danger);cursor:pointer;background:none;border:1px solid var(--danger);margin-bottom:6px;transition:all .2s}
 .nav-logout:hover{background:rgba(255,68,68,.1)}
 
@@ -138,10 +137,23 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 /* CHART */
 .chart-wrap{background:var(--panel);border:1px solid var(--border);padding:20px;margin-top:12px;position:relative}
 .chart-wrap canvas{max-height:280px}
+/* Shorter canvas for the square-wave chart — it only has 2 states */
+.chart-wrap.chart-sq canvas{max-height:150px}
+
 .chart-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 .chart-toolbar label{font-family:var(--font-mono);font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
 .chart-toolbar input[type=date]{padding:6px 10px;background:#0d1810;border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:.8rem;outline:none}
 .chart-toolbar input[type=date]:focus{border-color:var(--accent)}
+
+/* Chart header with stat pills */
+.chart-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.chart-title{font-family:var(--font-mono);font-size:.65rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+.chart-stats{display:flex;gap:8px;flex-wrap:wrap}
+.stat-pill{font-family:var(--font-mono);font-size:.6rem;padding:3px 10px;border-radius:2px;border:1px solid var(--border);color:var(--muted)}
+.stat-pill span{font-weight:700}
+.stat-pill.green span{color:var(--accent)}
+.stat-pill.amber span{color:var(--warn)}
+.stat-pill.blue  span{color:var(--accent2)}
 
 /* DATA RECORDS TABLE */
 .records-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:.72rem;margin-top:12px}
@@ -231,7 +243,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       </div>
     </div>
 
-    <!-- LED Legend -->
     <div class="led-legend">
       <div class="led-item"><div class="led-dot blue"></div>Connecting WiFi</div>
       <div class="led-item"><div class="led-dot red"></div>Auto — Idle</div>
@@ -288,23 +299,64 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <button class="btn-export" onclick="exportFullExcel()" style="border-color:var(--warn);color:var(--warn);">⬇ Full Export · All Data (.xlsx)</button>
     </div>
 
+    <!-- 1. Temperature -->
     <div class="chart-wrap">
-      <div style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-bottom:10px;letter-spacing:.12em;">TEMPERATURE (°C)</div>
+      <div class="chart-header">
+        <div class="chart-title">TEMPERATURE (°C)</div>
+        <div class="chart-stats">
+          <div class="stat-pill green">Inside avg <span id="stat_tInAvg">--</span> °C</div>
+          <div class="stat-pill amber">Outside avg <span id="stat_tOutAvg">--</span> °C</div>
+        </div>
+      </div>
       <canvas id="chartTemp"></canvas>
     </div>
 
+    <!-- 2. Humidity -->
     <div class="chart-wrap" style="margin-top:12px;">
-      <div style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-bottom:10px;letter-spacing:.12em;">HUMIDITY (% RH)</div>
+      <div class="chart-header">
+        <div class="chart-title">HUMIDITY (% RH)</div>
+        <div class="chart-stats">
+          <div class="stat-pill blue">Inside avg <span id="stat_hInAvg">--</span> %</div>
+          <div class="stat-pill amber">Outside avg <span id="stat_hOutAvg">--</span> %</div>
+        </div>
+      </div>
       <canvas id="chartHum"></canvas>
     </div>
 
+    <!-- 3. MQ135 -->
     <div class="chart-wrap" style="margin-top:12px;">
-      <div style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-bottom:10px;letter-spacing:.12em;">MQ135 AIR QUALITY (raw ADC)</div>
+      <div class="chart-header">
+        <div class="chart-title">MQ135 AIR QUALITY (raw ADC)</div>
+        <div class="chart-stats">
+          <div class="stat-pill green">Inside avg <span id="stat_mqInAvg">--</span></div>
+          <div class="stat-pill amber">Outside avg <span id="stat_mqOutAvg">--</span></div>
+        </div>
+      </div>
       <canvas id="chartMQ"></canvas>
     </div>
 
+    <!-- 4. Humidifier square-wave -->
+    <div class="chart-wrap chart-sq" style="margin-top:12px;">
+      <div class="chart-header">
+        <div class="chart-title">HUMIDIFIER STATE — square wave (ON = 1, OFF = 0)</div>
+        <div class="chart-stats">
+          <div class="stat-pill green">Total ON <span id="stat_motorTotal">--</span></div>
+          <div class="stat-pill amber">Cycles <span id="stat_motorCycles">--</span></div>
+          <div class="stat-pill blue">Avg run <span id="stat_motorAvgRun">--</span></div>
+        </div>
+      </div>
+      <canvas id="chartMotor"></canvas>
+    </div>
+
+    <!-- 5. Lux -->
     <div class="chart-wrap" style="margin-top:12px;">
-      <div style="font-family:var(--font-mono);font-size:.65rem;color:var(--muted);margin-bottom:10px;letter-spacing:.12em;">LIGHT (lux) & HUMIDIFIER ON TIME (s per 15min)</div>
+      <div class="chart-header">
+        <div class="chart-title">LIGHT LEVEL (lux)</div>
+        <div class="chart-stats">
+          <div class="stat-pill amber">Max <span id="stat_luxMax">--</span> lux</div>
+          <div class="stat-pill blue">Avg <span id="stat_luxAvg">--</span> lux</div>
+        </div>
+      </div>
       <canvas id="chartLux"></canvas>
     </div>
 
@@ -312,7 +364,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 
   <!-- ══ PAGE: BATCH INFO ════════════════════════════════ -->
   <div class="page" id="page-batch">
-
     <div class="section-label">// add new batch</div>
     <div class="form-card">
       <h3>New Batch Entry</h3>
@@ -333,7 +384,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       </div>
       <div id="batchMsg" class="ctrl-msg" style="color:var(--accent2);"></div>
     </div>
-
     <div class="section-label">// batch records</div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
       <button class="btn-export" onclick="exportBatchCSV()">⬇ Export Batch (.xlsx)</button>
@@ -342,12 +392,10 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <thead><tr><th>Batch ID</th><th>Spawn Type</th><th>Substrate</th><th>Spawn Date</th><th>Bags</th><th>Notes</th></tr></thead>
       <tbody id="batchTableBody"></tbody>
     </table>
-
-  </div><!-- end batch -->
+  </div>
 
   <!-- ══ PAGE: HARVEST LOG ═══════════════════════════════ -->
   <div class="page" id="page-harvest">
-
     <div class="section-label">// add harvest record</div>
     <div class="form-card">
       <h3>New Harvest Entry</h3>
@@ -365,7 +413,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       </div>
       <div id="harvestMsg" class="ctrl-msg" style="color:var(--accent2);"></div>
     </div>
-
     <div class="section-label">// harvest records</div>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:12px;">
       <button class="btn-export" onclick="exportHarvestCSV()">⬇ Export Harvest (.xlsx)</button>
@@ -374,12 +421,10 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <thead><tr><th>Batch ID</th><th>Flush</th><th>Harvest Date</th><th>Yield (g)</th><th>Notes</th></tr></thead>
       <tbody id="harvestTableBody"></tbody>
     </table>
-
-  </div><!-- end harvest -->
+  </div>
 
   <!-- ══ PAGE: SETTINGS ══════════════════════════════════ -->
   <div class="page" id="page-settings">
-
     <div class="section-label">// remote control</div>
     <div class="control-grid">
       <div class="ctrl-panel">
@@ -401,7 +446,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         <div id="limMsg" class="ctrl-msg" style="color:var(--accent2);"></div>
       </div>
     </div>
-
     <div class="section-label">// motor timing controls</div>
     <div class="control-grid">
       <div class="ctrl-panel">
@@ -431,8 +475,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         <div id="maxMsg" class="ctrl-msg" style="color:var(--accent2);"></div>
       </div>
     </div>
-
-  </div><!-- end settings -->
+  </div>
 
   <div class="footer">
     <span>esp32 · mushroom-farm-dd30b · asia-southeast1</span>
@@ -454,7 +497,7 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db   = firebase.database();
 
-/* ── LOGIN / LOGOUT ── */
+/* ── LOGIN / LOGOUT ────────────────────────────────────── */
 function login() {
   const email = document.getElementById("email").value.trim();
   const pass  = document.getElementById("password").value;
@@ -462,21 +505,17 @@ function login() {
   auth.signInWithEmailAndPassword(email, pass)
     .catch(e => { document.getElementById("loginError").innerText = e.message; });
 }
-
 function logout() {
   if (!confirm("Log out?")) return;
-  // detach all listeners before signing out to avoid permission errors
   db.ref("esp32").off();
   auth.signOut().then(() => {
     document.getElementById("dashboard").style.display = "none";
     document.getElementById("loginBox").style.display  = "flex";
     document.getElementById("email").value    = "";
     document.getElementById("password").value = "";
-    // destroy charts so they can be recreated on next login
     destroyCharts();
   });
 }
-
 auth.onAuthStateChanged(user => {
   if (user) {
     document.getElementById("loginBox").style.display  = "none";
@@ -489,21 +528,20 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-/* ── MOTOR ON TRACKING ── */
-let motorOnSince      = null;
+/* ── MOTOR DURATION TRACKER ────────────────────────────── */
+let motorOnSince       = null;
 let motorDurationTimer = null;
 
 function formatDuration(ms) {
   if (ms < 0) ms = 0;
-  const s = Math.floor(ms / 1000);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sec).padStart(2,'0')}s`;
-  if (m > 0) return `${m}m ${String(sec).padStart(2,'0')}s`;
-  return `${sec}s`;
+  const s  = Math.floor(ms / 1000);
+  const h  = Math.floor(s / 3600);
+  const m  = Math.floor((s % 3600) / 60);
+  const sc = s % 60;
+  if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m ${String(sc).padStart(2,'0')}s`;
+  if (m > 0) return `${m}m ${String(sc).padStart(2,'0')}s`;
+  return `${sc}s`;
 }
-
 function startDurationTick() {
   clearInterval(motorDurationTimer);
   motorDurationTimer = setInterval(() => {
@@ -512,27 +550,18 @@ function startDurationTick() {
         formatDuration(Date.now() - motorOnSince);
   }, 1000);
 }
+function stopDurationTick() { clearInterval(motorDurationTimer); motorDurationTimer = null; }
 
-function stopDurationTick() {
-  clearInterval(motorDurationTimer);
-  motorDurationTimer = null;
-}
-
-/* ── TANK STATE ── */
+/* ── TANK STATE ────────────────────────────────────────── */
 let tankLowVal = false, tankFullVal = false;
-
 function updateTankGraphic() {
-  /* ESP32: LOW pin HIGH = no water at bottom → tankLow = true  (empty)
-            FULL pin HIGH = no water at top   → tankFull = true (not full) */
   let fillPct, statusText, badgeClass, statusClass;
-
-  if (!tankLowVal && !tankFullVal)     { fillPct = 95; statusText = "TANK FULL";    badgeClass = "full";  statusClass = "full";  }
-  else if (!tankLowVal && tankFullVal) { fillPct = 50; statusText = "MID LEVEL";    badgeClass = "ok";    statusClass = "ok";    }
-  else if ( tankLowVal && tankFullVal) { fillPct =  5; statusText = "⚠ EMPTY";      badgeClass = "empty"; statusClass = "empty"; }
-  else                                  { fillPct = 10; statusText = "SENSOR FAULT"; badgeClass = "low";   statusClass = "low";   }
+  if (!tankLowVal && !tankFullVal)     { fillPct=95; statusText="TANK FULL";    badgeClass="full";  statusClass="full";  }
+  else if (!tankLowVal && tankFullVal) { fillPct=50; statusText="MID LEVEL";    badgeClass="ok";    statusClass="ok";    }
+  else if ( tankLowVal && tankFullVal) { fillPct= 5; statusText="⚠ EMPTY";      badgeClass="empty"; statusClass="empty"; }
+  else                                  { fillPct=10; statusText="SENSOR FAULT"; badgeClass="low";   statusClass="low";   }
 
   document.getElementById("tankWater").style.height = fillPct + "%";
-
   const badge = document.getElementById("tankBadge");
   badge.className = "tank-status-badge " + badgeClass;
   badge.innerText  = statusText;
@@ -541,38 +570,28 @@ function updateTankGraphic() {
   const fullText = tankFullVal ? "HIGH (empty at sensor)" : "LOW (water present)";
   const lc = tankLowVal  ? "empty" : "ok";
   const fc = tankFullVal ? "empty" : "full";
-
-  const il = document.getElementById("info_tankLow");    il.innerText = lowText;    il.className = "row-val " + lc;
-  const iF = document.getElementById("info_tankFull");   iF.innerText = fullText;   iF.className = "row-val " + fc;
-  const is = document.getElementById("info_tankStatus"); is.innerText = statusText; is.className = "row-val " + statusClass;
+  const il = document.getElementById("info_tankLow");    il.innerText=lowText;    il.className="row-val "+lc;
+  const iF = document.getElementById("info_tankFull");   iF.innerText=fullText;   iF.className="row-val "+fc;
+  const is = document.getElementById("info_tankStatus"); is.innerText=statusText; is.className="row-val "+statusClass;
 }
 
-/* ── LIVE LISTENERS ── */
+/* ── LIVE LISTENERS ────────────────────────────────────── */
 function startListeners() {
   db.ref("esp32/SHT30/Temperature").on("value", s => {
-    const v = s.val();
-    setText("val_tempIn", v !== null ? v.toFixed(1) : "--");
-    flagCard("card_tempIn", v, 15, 35);
-    markUpdate();
+    const v=s.val(); setText("val_tempIn", v!==null?v.toFixed(1):"--"); flagCard("card_tempIn",v,15,35); markUpdate();
   });
   db.ref("esp32/SHT30/Humidity").on("value", s => {
-    const v = s.val();
-    setText("val_humIn", v !== null ? v.toFixed(1) : "--");
-    flagCard("card_humIn", v, 80, 95);
-    markUpdate();
+    const v=s.val(); setText("val_humIn", v!==null?v.toFixed(1):"--"); flagCard("card_humIn",v,80,95); markUpdate();
   });
   db.ref("esp32/SHT30_Outside/Temperature").on("value", s => {
-    const v = s.val();
-    setText("val_tempOut", v !== null ? v.toFixed(1) : "--");
-    flagCard("card_tempOut", v, 10, 40);
+    const v=s.val(); setText("val_tempOut", v!==null?v.toFixed(1):"--"); flagCard("card_tempOut",v,10,40);
   });
   db.ref("esp32/SHT30_Outside/Humidity").on("value", s => {
-    const v = s.val();
-    setText("val_humOut", v !== null ? v.toFixed(1) : "--");
+    setText("val_humOut", s.val()!==null?s.val().toFixed(1):"--");
   });
-  db.ref("esp32/LUX").on("value",          s => setText("val_lux",   s.val() !== null ? Math.round(s.val()) : "--"));
-  db.ref("esp32/MQ135/Inside").on("value", s => setText("val_mqIn",  s.val() !== null ? s.val() : "--"));
-  db.ref("esp32/MQ135/Outside").on("value",s => setText("val_mqOut", s.val() !== null ? s.val() : "--"));
+  db.ref("esp32/LUX").on("value",          s => setText("val_lux",   s.val()!==null?Math.round(s.val()):"--"));
+  db.ref("esp32/MQ135/Inside").on("value", s => setText("val_mqIn",  s.val()!==null?s.val():"--"));
+  db.ref("esp32/MQ135/Outside").on("value",s => setText("val_mqOut", s.val()!==null?s.val():"--"));
 
   db.ref("esp32/Tank/Low").on("value",  s => { tankLowVal  = !!s.val(); updateTankGraphic(); });
   db.ref("esp32/Tank/Full").on("value", s => { tankFullVal = !!s.val(); updateTankGraphic(); });
@@ -581,111 +600,259 @@ function startListeners() {
     const on = !!s.val();
     document.getElementById("motorLabel").innerText = on ? "RUNNING" : "IDLE";
     document.getElementById("motorDot").classList.toggle("on", on);
-
-    // Update mode label based on current override state
     db.ref("esp32/control/manual_override").once("value", ms => {
-      const override = !!ms.val();
-      if (override) {
-        document.getElementById("motorModeLabel").innerText =
-          on ? "🟡 manual override · ON" : "🟡 manual override · OFF";
-      } else if (tankLowVal) {
-        document.getElementById("motorModeLabel").innerText = "⚠ tank empty — motor locked OFF";
-      } else {
-        document.getElementById("motorModeLabel").innerText = "auto mode · relay active-low · pin 25";
-      }
+      const ov = !!ms.val();
+      if (ov)             document.getElementById("motorModeLabel").innerText = on ? "🟡 manual override · ON" : "🟡 manual override · OFF";
+      else if (tankLowVal) document.getElementById("motorModeLabel").innerText = "⚠ tank empty — motor locked OFF";
+      else                 document.getElementById("motorModeLabel").innerText = "auto mode · relay active-low · pin 25";
     });
-
     if (on) {
       if (motorOnSince === null) {
         motorOnSince = Date.now();
         const now = new Date();
-        document.getElementById("motorLastOn").innerText =
-          now.toLocaleDateString() + "  " + now.toLocaleTimeString();
+        document.getElementById("motorLastOn").innerText = now.toLocaleDateString()+"  "+now.toLocaleTimeString();
         document.getElementById("motorDuration").innerText = "0s";
         startDurationTick();
       }
     } else {
       if (motorOnSince !== null) {
         const elapsed = Date.now() - motorOnSince;
-        document.getElementById("motorDuration").innerText =
-          formatDuration(elapsed) + " (last run)";
+        document.getElementById("motorDuration").innerText = formatDuration(elapsed)+" (last run)";
         motorOnSince = null;
         stopDurationTick();
       }
     }
   });
 
-  db.ref("esp32/heartbeat").on("value", s => {
-    if (s.val() !== null) { setWifi(true); resetHeartbeatTimer(); }
-  });
+  db.ref("esp32/heartbeat").on("value", s => { if(s.val()!==null){setWifi(true);resetHeartbeatTimer();} });
 
-  /* Pre-fill settings inputs */
-  db.ref("esp32/control/humidity_low").once("value",  s => { if (s.val() !== null) document.getElementById("inp_humLow").value  = s.val(); });
-  db.ref("esp32/control/humidity_high").once("value", s => { if (s.val() !== null) document.getElementById("inp_humHigh").value = s.val(); });
-  db.ref("esp32/control/min_run_time").once("value",  s => { if (s.val() !== null) document.getElementById("inp_minRun").value  = s.val(); });
-  db.ref("esp32/control/min_off_time").once("value",  s => { if (s.val() !== null) document.getElementById("inp_minOff").value  = s.val(); });
-  db.ref("esp32/control/max_run_time").once("value",  s => { if (s.val() !== null) document.getElementById("inp_maxRun").value  = s.val(); });
+  db.ref("esp32/control/humidity_low").once("value",  s => { if(s.val()!==null) document.getElementById("inp_humLow").value  = s.val(); });
+  db.ref("esp32/control/humidity_high").once("value", s => { if(s.val()!==null) document.getElementById("inp_humHigh").value = s.val(); });
+  db.ref("esp32/control/min_run_time").once("value",  s => { if(s.val()!==null) document.getElementById("inp_minRun").value  = s.val(); });
+  db.ref("esp32/control/min_off_time").once("value",  s => { if(s.val()!==null) document.getElementById("inp_minOff").value  = s.val(); });
+  db.ref("esp32/control/max_run_time").once("value",  s => { if(s.val()!==null) document.getElementById("inp_maxRun").value  = s.val(); });
 }
 
-/* ── CHARTS ── */
-let chartTemp = null, chartHum = null, chartMQ = null, chartLux = null;
+/* ══════════════════════════════════════════════════════════
+   CHARTS
+   ══════════════════════════════════════════════════════════ */
+let chartTemp=null, chartHum=null, chartMQ=null, chartMotor=null, chartLux=null;
 let chartsInited = false;
 
-const chartDefaults = {
-  responsive: true,
-  plugins: { legend: { labels: { color:'#4a7a5a', font:{ family:'Share Tech Mono', size:11 } } } },
-  scales: {
-    x: { ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } }, grid:{ color:'#1e3327' } },
-    y: { ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } }, grid:{ color:'#1e3327' } }
-  }
+/* Shared axis / legend defaults */
+const _xAxis = {
+  ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 }, maxRotation:45, autoSkip:true, maxTicksLimit:24 },
+  grid:{ color:'#1e3327' }
 };
+const _yAxis = {
+  ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } },
+  grid:{ color:'#1e3327' }
+};
+const _legend = { labels:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:11 } } };
 
-function makeChart(id, datasets) {
-  const ctx = document.getElementById(id).getContext("2d");
+function _makeLineChart(canvasId, datasets, yOverride) {
+  const ctx = document.getElementById(canvasId).getContext("2d");
   return new Chart(ctx, {
     type: 'line',
     data: { labels:[], datasets },
-    options: JSON.parse(JSON.stringify(chartDefaults))
+    options: {
+      responsive: true,
+      interaction: { mode:'index', intersect:false },
+      plugins: { legend: _legend },
+      scales: { x: _xAxis, y: Object.assign({}, _yAxis, yOverride||{}) }
+    }
   });
 }
 
-/* FIX: destroy charts before re-creating to avoid canvas reuse error */
 function destroyCharts() {
-  if (chartTemp) { chartTemp.destroy(); chartTemp = null; }
-  if (chartHum)  { chartHum.destroy();  chartHum  = null; }
-  if (chartMQ)   { chartMQ.destroy();   chartMQ   = null; }
-  if (chartLux)  { chartLux.destroy();  chartLux  = null; }
-  chartsInited = false;
+  [chartTemp, chartHum, chartMQ, chartMotor, chartLux].forEach(c => { if(c) c.destroy(); });
+  chartTemp=chartHum=chartMQ=chartMotor=chartLux=null;
+  chartsInited=false;
 }
 
 function initCharts() {
   if (chartsInited) return;
   chartsInited = true;
 
-  chartTemp = makeChart("chartTemp", [
-    { label:"Inside °C",  data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.08)",  tension:.3, pointRadius:3 },
-    { label:"Outside °C", data:[], borderColor:"#ffb800", backgroundColor:"rgba(255,184,0,.05)",   tension:.3, pointRadius:3 }
+  /* Temperature */
+  chartTemp = _makeLineChart("chartTemp", [
+    { label:"Inside °C",  data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.08)",  tension:.3, pointRadius:2 },
+    { label:"Outside °C", data:[], borderColor:"#ffb800", backgroundColor:"rgba(255,184,0,.05)",   tension:.3, pointRadius:2 }
   ]);
-  chartHum = makeChart("chartHum", [
-    { label:"Inside % RH",  data:[], borderColor:"#00c9ff", backgroundColor:"rgba(0,201,255,.08)", tension:.3, pointRadius:3 },
-    { label:"Outside % RH", data:[], borderColor:"#9b59b6", backgroundColor:"rgba(155,89,182,.05)",tension:.3, pointRadius:3 }
+
+  /* Humidity */
+  chartHum = _makeLineChart("chartHum", [
+    { label:"Inside % RH",  data:[], borderColor:"#00c9ff", backgroundColor:"rgba(0,201,255,.08)", tension:.3, pointRadius:2 },
+    { label:"Outside % RH", data:[], borderColor:"#9b59b6", backgroundColor:"rgba(155,89,182,.05)",tension:.3, pointRadius:2 }
   ]);
-  chartMQ = makeChart("chartMQ", [
-    { label:"MQ135 Inside",  data:[], borderColor:"#ff6b6b", backgroundColor:"rgba(255,107,107,.08)", tension:.3, pointRadius:3 },
-    { label:"MQ135 Outside", data:[], borderColor:"#ffa07a", backgroundColor:"rgba(255,160,122,.05)", tension:.3, pointRadius:3 }
+
+  /* MQ135 */
+  chartMQ = _makeLineChart("chartMQ", [
+    { label:"MQ135 Inside",  data:[], borderColor:"#ff6b6b", backgroundColor:"rgba(255,107,107,.08)", tension:.3, pointRadius:2 },
+    { label:"MQ135 Outside", data:[], borderColor:"#ffa07a", backgroundColor:"rgba(255,160,122,.05)", tension:.3, pointRadius:2 }
   ]);
-  chartLux = makeChart("chartLux", [
-    { label:"Lux",          data:[], borderColor:"#f9ca24", backgroundColor:"rgba(249,202,36,.08)", tension:.3, pointRadius:3, yAxisID:'y'  },
-    { label:"Motor ON (s)", data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.06)", tension:.3, pointRadius:3, yAxisID:'y1', borderDash:[5,3] }
-  ]);
-  chartLux.options.scales.y1 = {
-    type:'linear', position:'right',
-    ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 } },
-    grid:{ drawOnChartArea:false }
-  };
-  chartLux.update();
+
+  /* ── Humidifier square-wave chart ──────────────────────
+     Data source: motorOnS (0–900 seconds per 15-min window).
+
+     Two layers rendered on the same canvas:
+       Layer 1 (bar, back):  raw motorOnS value against right
+                              axis (0–900 s) — shows how long ON.
+       Layer 2 (line, front): binary 0/1 square wave against left
+                              axis — stepped:'before' creates the
+                              hard vertical edges of a real square wave.
+                              Filled area makes ON periods vivid.
+
+     Left Y-axis labels: "OFF" at 0, "ON" at 1.
+     Right Y-axis: 0 s → 900 s (one 15-min window max).
+  ──────────────────────────────────────────────────────── */
+  const motorCtx = document.getElementById("chartMotor").getContext("2d");
+  chartMotor = new Chart(motorCtx, {
+    data: {
+      labels: [],
+      datasets: [
+        /* Layer 1 — bar: raw seconds, muted fill, right axis */
+        {
+          type: 'bar',
+          label: 'ON duration (s)',
+          data: [],
+          backgroundColor: 'rgba(57,255,143,0.10)',
+          borderColor:     'rgba(57,255,143,0.22)',
+          borderWidth: 1,
+          yAxisID: 'yRight',
+          order: 2,
+          barPercentage: 0.9,
+          categoryPercentage: 1.0
+        },
+        /* Layer 2 — step line: square wave, left axis */
+        {
+          type: 'line',
+          label: 'State (ON=1 / OFF=0)',
+          data: [],
+          borderColor:          '#39ff8f',
+          backgroundColor:      'rgba(57,255,143,0.18)',
+          borderWidth:          2.5,
+          pointRadius:          4,
+          pointHoverRadius:     6,
+          pointBackgroundColor: '#39ff8f',
+          pointBorderColor:     '#0a0f0d',
+          pointBorderWidth:     1.5,
+          fill:    true,
+          stepped: 'before',   /* ← produces the square wave */
+          tension: 0,
+          yAxisID: 'yLeft',
+          order: 1
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      interaction: { mode:'index', intersect:false },
+      plugins: {
+        legend: _legend,
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              if (ctx.dataset.type === 'bar')
+                return `  ON: ${ctx.parsed.y}s / 900s`;
+              return `  State: ${ctx.parsed.y === 1 ? '🟢 ON' : '🔴 OFF'}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: _xAxis,
+        /* Left Y: binary 0/1 labelled OFF/ON */
+        yLeft: {
+          type: 'linear',
+          position: 'left',
+          min: -0.08,
+          max:  1.2,
+          ticks: {
+            color: '#4a7a5a',
+            font: { family:'Share Tech Mono', size:10 },
+            stepSize: 1,
+            callback: v => v === 1 ? 'ON' : v === 0 ? 'OFF' : ''
+          },
+          grid: { color:'#1e3327' }
+        },
+        /* Right Y: raw seconds per window */
+        yRight: {
+          type: 'linear',
+          position: 'right',
+          min: 0,
+          max: 900,
+          ticks: {
+            color: '#2a4a3a',
+            font: { family:'Share Tech Mono', size:9 },
+            callback: v => v + 's'
+          },
+          grid: { drawOnChartArea: false }
+        }
+      }
+    }
+  });
+
+  /* Lux — standalone, yellow/amber theme, filled */
+  chartLux = _makeLineChart("chartLux", [
+    {
+      label: 'Light (lux)',
+      data: [],
+      borderColor:     '#f9ca24',
+      backgroundColor: 'rgba(249,202,36,0.10)',
+      borderWidth: 2,
+      tension: .35,
+      pointRadius: 2,
+      fill: true
+    }
+  ], {
+    ticks: {
+      color:'#4a7a5a',
+      font:{ family:'Share Tech Mono', size:10 },
+      callback: v => v + ' lx'
+    }
+  });
 }
 
+/* ── STAT HELPERS ────────────────────────────────────────── */
+function _avg(arr) {
+  const v = arr.filter(x => x !== null && x !== undefined && !isNaN(x));
+  return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null;
+}
+function _sf(v, d=1) { return (v !== null && !isNaN(v)) ? (+v).toFixed(d) : '--'; }
+function _fmtS(s) {
+  if (s===null||isNaN(s)||s<0) return '--';
+  if (s < 60) return s + 's';
+  return Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s';
+}
+
+function computeAndDisplayStats(tIn, tOut, hIn, hOut, mqIn, mqOut, motorOnSArr, luxArr) {
+  /* Temp / hum / mq averages */
+  setText("stat_tInAvg",   _sf(_avg(tIn)));
+  setText("stat_tOutAvg",  _sf(_avg(tOut)));
+  setText("stat_hInAvg",   _sf(_avg(hIn)));
+  setText("stat_hOutAvg",  _sf(_avg(hOut)));
+  setText("stat_mqInAvg",  _sf(_avg(mqIn),  0));
+  setText("stat_mqOutAvg", _sf(_avg(mqOut), 0));
+
+  /* Motor stats */
+  const valid  = motorOnSArr.filter(v => v !== null);
+  const totalS = valid.reduce((a,b)=>a+b, 0);
+  let cycles = 0, wasOn = false;
+  valid.forEach(v => { const on = v>0; if(on&&!wasOn) cycles++; wasOn=on; });
+  const avgRun = cycles>0 ? Math.round(totalS/cycles) : null;
+  setText("stat_motorTotal",  _fmtS(totalS));
+  setText("stat_motorCycles", cycles>0 ? cycles : '--');
+  setText("stat_motorAvgRun", _fmtS(avgRun));
+
+  /* Lux stats */
+  const vLux   = luxArr.filter(v=>v!==null&&!isNaN(v));
+  const maxLux = vLux.length ? Math.round(Math.max(...vLux)) : null;
+  setText("stat_luxMax", maxLux!==null ? maxLux : '--');
+  setText("stat_luxAvg", _sf(_avg(luxArr), 0));
+}
+
+/* ── LOAD CHART DATA ──────────────────────────────────── */
 function loadChartData() {
   const dateStr = document.getElementById("chartDate").value;
   if (!dateStr) { alert("Select a date first"); return; }
@@ -695,7 +862,9 @@ function loadChartData() {
 
     const raw  = snap.val();
     const keys = Object.keys(raw).sort();
-    const labels=[], tIn=[], tOut=[], hIn=[], hOut=[], mqIn=[], mqOut=[], luxArr=[], motorArr=[];
+
+    const labels=[], tIn=[], tOut=[], hIn=[], hOut=[];
+    const mqIn=[], mqOut=[], motorOnSArr=[], luxArr=[];
 
     keys.forEach(k => {
       const r = raw[k];
@@ -706,337 +875,221 @@ function loadChartData() {
       hOut.push(r.humOut  ?? null);
       mqIn.push(r.mqIn    ?? null);
       mqOut.push(r.mqOut  ?? null);
+      motorOnSArr.push(r.motorOnS ?? null);
       luxArr.push(r.lux   ?? null);
-      motorArr.push(r.motorOnS ?? null);
     });
 
-    const update = (chart, lbl, ...datasets) => {
+    /*
+     * Square wave layer:
+     *   1 = was ON for any part of the 15-min window (motorOnS > 0)
+     *   0 = fully OFF the whole window (motorOnS === 0)
+     *  null = no data logged for that slot
+     */
+    const motorSquare = motorOnSArr.map(v => v === null ? null : (v > 0 ? 1 : 0));
+
+    /* Update standard charts */
+    const upd = (chart, lbl, ...ds) => {
       chart.data.labels = lbl;
-      datasets.forEach((d,i) => chart.data.datasets[i].data = d);
+      ds.forEach((d,i) => chart.data.datasets[i].data = d);
       chart.update();
     };
+    upd(chartTemp, labels, tIn, tOut);
+    upd(chartHum,  labels, hIn, hOut);
+    upd(chartMQ,   labels, mqIn, mqOut);
+    upd(chartLux,  labels, luxArr);
 
-    update(chartTemp, labels, tIn, tOut);
-    update(chartHum,  labels, hIn, hOut);
-    update(chartMQ,   labels, mqIn, mqOut);
-    update(chartLux,  labels, luxArr, motorArr);
+    /* Motor chart: dataset[0] = bar (raw s), dataset[1] = square wave */
+    chartMotor.data.labels                = labels;
+    chartMotor.data.datasets[0].data      = motorOnSArr;  // bar
+    chartMotor.data.datasets[1].data      = motorSquare;  // step line
+    chartMotor.update();
+
+    computeAndDisplayStats(tIn, tOut, hIn, hOut, mqIn, mqOut, motorOnSArr, luxArr);
   });
 }
 
 /* ══════════════════════════════════════════════════════════
-   EXCEL EXPORT HELPERS
+   EXCEL EXPORT
    ══════════════════════════════════════════════════════════ */
 function downloadXLSX(wb, filename) {
-  const wbout = XLSX.write(wb, { bookType:"xlsx", type:"array" });
-  const blob  = new Blob([wbout], { type:"application/octet-stream" });
-  const url   = URL.createObjectURL(blob);
-  const a     = document.createElement("a");
-  a.href      = url;
-  a.download  = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
+  const out  = XLSX.write(wb, { bookType:"xlsx", type:"array" });
+  const blob = new Blob([out], { type:"application/octet-stream" });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href=url; a.download=filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(url); }, 200);
 }
-
-function styleHeader(ws, numCols) {
-  const headerStyle = {
-    font:{ bold:true, color:{ rgb:"0A0F0D" } },
-    fill:{ fgColor:{ rgb:"39FF8F" } },
-    alignment:{ horizontal:"center" }
-  };
-  for (let c = 0; c < numCols; c++) {
-    const cell = ws[XLSX.utils.encode_cell({ r:0, c })];
-    if (cell) cell.s = headerStyle;
-  }
+function styleHeader(ws, n) {
+  const s = { font:{bold:true,color:{rgb:"0A0F0D"}}, fill:{fgColor:{rgb:"39FF8F"}}, alignment:{horizontal:"center"} };
+  for(let c=0;c<n;c++){ const cell=ws[XLSX.utils.encode_cell({r:0,c})]; if(cell) cell.s=s; }
 }
-
 function buildProductionRows(dateStr, raw) {
-  const rows = [["Timestamp","Temp Inside (°C)","Humidity Inside (%)","Temp Outside (°C)","Humidity Outside (%)","Light (lux)","MQ135 Inside (ADC)","MQ135 Outside (ADC)","Humidifier ON (sec)"]];
-  Object.keys(raw).sort().forEach(k => {
-    const r = raw[k];
-    rows.push([
-      dateStr + " " + k.replace("-",":"),
-      r.tempIn ?? '', r.humIn ?? '', r.tempOut ?? '', r.humOut ?? '',
-      r.lux ?? '', r.mqIn ?? '', r.mqOut ?? '', r.motorOnS ?? 0
-    ]);
+  const rows=[["Timestamp","Temp In (°C)","Hum In (%)","Temp Out (°C)","Hum Out (%)","Light (lux)","MQ135 In","MQ135 Out","Motor ON (s)","State"]];
+  Object.keys(raw).sort().forEach(k=>{
+    const r=raw[k];
+    rows.push([dateStr+" "+k.replace("-",":"), r.tempIn??'',r.humIn??'',r.tempOut??'',r.humOut??'',r.lux??'',r.mqIn??'',r.mqOut??'',r.motorOnS??0,(r.motorOnS??0)>0?'ON':'OFF']);
   });
   return rows;
 }
-
 function exportDayExcel() {
-  const dateStr = document.getElementById("chartDate").value;
-  if (!dateStr) { alert("Select a date first"); return; }
-  db.ref("esp32/logs/" + dateStr).once("value", snap => {
-    if (!snap.exists()) { alert("No production data for " + dateStr); return; }
-    const rows = buildProductionRows(dateStr, snap.val());
-    const ws   = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [20,18,20,20,22,14,20,20,20].map(w => ({ wch:w }));
-    styleHeader(ws, rows[0].length);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Production " + dateStr);
-    downloadXLSX(wb, "production_" + dateStr + ".xlsx");
+  const d=document.getElementById("chartDate").value;
+  if(!d){alert("Select a date first");return;}
+  db.ref("esp32/logs/"+d).once("value",snap=>{
+    if(!snap.exists()){alert("No data for "+d);return;}
+    const rows=buildProductionRows(d,snap.val());
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    ws["!cols"]=[20,14,12,16,14,12,12,12,14,10].map(w=>({wch:w}));
+    styleHeader(ws,rows[0].length);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Production "+d);
+    downloadXLSX(wb,"production_"+d+".xlsx");
   });
 }
-
 function exportFullExcel() {
-  const dateStr = document.getElementById("chartDate").value;
+  const d=document.getElementById("chartDate").value;
   Promise.all([
-    dateStr ? db.ref("esp32/logs/" + dateStr).once("value") : Promise.resolve(null),
+    d?db.ref("esp32/logs/"+d).once("value"):Promise.resolve(null),
     db.ref("farm/batches").once("value"),
     db.ref("farm/harvests").once("value")
-  ]).then(([prodSnap, batchSnap, harvestSnap]) => {
-    const wb = XLSX.utils.book_new();
-
-    if (prodSnap && prodSnap.exists()) {
-      const rows = buildProductionRows(dateStr, prodSnap.val());
-      const ws   = XLSX.utils.aoa_to_sheet(rows);
-      ws["!cols"] = [20,18,20,20,22,14,20,20,20].map(w => ({ wch:w }));
-      styleHeader(ws, rows[0].length);
-      XLSX.utils.book_append_sheet(wb, ws, "Production");
+  ]).then(([pSnap,bSnap,hSnap])=>{
+    const wb=XLSX.utils.book_new();
+    if(pSnap&&pSnap.exists()){
+      const rows=buildProductionRows(d,pSnap.val());
+      const ws=XLSX.utils.aoa_to_sheet(rows);
+      ws["!cols"]=[20,14,12,16,14,12,12,12,14,10].map(w=>({wch:w}));
+      styleHeader(ws,rows[0].length);
+      XLSX.utils.book_append_sheet(wb,ws,"Production");
     } else {
-      const ws = XLSX.utils.aoa_to_sheet([["No production data", dateStr ? "for " + dateStr : "— select a date and reload"]]);
-      XLSX.utils.book_append_sheet(wb, ws, "Production");
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([["No production data",d?"for "+d:"— select a date"]]),"Production");
     }
-
-    const batchRows = [["Batch ID","Spawn Type","Substrate","Spawn Date","No. of Bags","Notes"]];
-    if (batchSnap && batchSnap.exists()) {
-      Object.values(batchSnap.val())
-        .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
-        .forEach(r => batchRows.push([r.id, r.spawn, r.substrate, r.date, r.bags, r.notes||'']));
-    }
-    const wsBatch = XLSX.utils.aoa_to_sheet(batchRows);
-    wsBatch["!cols"] = [14,16,16,14,12,30].map(w => ({ wch:w }));
-    styleHeader(wsBatch, batchRows[0].length);
-    XLSX.utils.book_append_sheet(wb, wsBatch, "Batch Info");
-
-    const harvestRows = [["Batch ID","Flush No.","Harvest Date","Yield (g)","Notes"]];
-    if (harvestSnap && harvestSnap.exists()) {
-      Object.values(harvestSnap.val())
-        .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
-        .forEach(r => harvestRows.push([r.batchId, "Flush " + r.flush, r.date, r.yield_g, r.notes||'']));
-    }
-    const wsHarvest = XLSX.utils.aoa_to_sheet(harvestRows);
-    wsHarvest["!cols"] = [14,12,14,12,30].map(w => ({ wch:w }));
-    styleHeader(wsHarvest, harvestRows[0].length);
-    XLSX.utils.book_append_sheet(wb, wsHarvest, "Harvest Log");
-
-    const fname = "mushroom_farm_export_" + new Date().toISOString().split("T")[0] + ".xlsx";
-    downloadXLSX(wb, fname);
-  }).catch(err => alert("Export failed: " + err.message));
+    const br=[["Batch ID","Spawn Type","Substrate","Spawn Date","No. of Bags","Notes"]];
+    if(bSnap&&bSnap.exists()) Object.values(bSnap.val()).sort((a,b)=>(a.date??'').localeCompare(b.date??'')).forEach(r=>br.push([r.id,r.spawn,r.substrate,r.date,r.bags,r.notes||'']));
+    const wsBatch=XLSX.utils.aoa_to_sheet(br); wsBatch["!cols"]=[14,16,16,14,12,30].map(w=>({wch:w})); styleHeader(wsBatch,br[0].length);
+    XLSX.utils.book_append_sheet(wb,wsBatch,"Batch Info");
+    const hr=[["Batch ID","Flush No.","Harvest Date","Yield (g)","Notes"]];
+    if(hSnap&&hSnap.exists()) Object.values(hSnap.val()).sort((a,b)=>(a.date??'').localeCompare(b.date??'')).forEach(r=>hr.push([r.batchId,"Flush "+r.flush,r.date,r.yield_g,r.notes||'']));
+    const wsH=XLSX.utils.aoa_to_sheet(hr); wsH["!cols"]=[14,12,14,12,30].map(w=>({wch:w})); styleHeader(wsH,hr[0].length);
+    XLSX.utils.book_append_sheet(wb,wsH,"Harvest Log");
+    downloadXLSX(wb,"mushroom_farm_export_"+new Date().toISOString().split("T")[0]+".xlsx");
+  }).catch(e=>alert("Export failed: "+e.message));
 }
 
-/* ── BATCH CRUD ── */
+/* ── BATCH CRUD ─────────────────────────────────────────── */
 function saveBatch() {
-  const id        = document.getElementById("b_id").value.trim();
-  const spawn     = document.getElementById("b_spawn").value.trim();
-  const substrate = document.getElementById("b_substrate").value.trim();
-  const date      = document.getElementById("b_date").value;
-  const bags      = parseInt(document.getElementById("b_bags").value);
-  const notes     = document.getElementById("b_notes").value.trim();
-
-  if (!id || !spawn || !substrate || !date || isNaN(bags)) {
-    showMsg("batchMsg", "✗ Fill all required fields"); return;
-  }
-
-  const record = { id, spawn, substrate, date, bags, notes, createdAt: new Date().toISOString() };
-  db.ref("farm/batches/" + id).set(record)
-    .then(() => {
-      showMsg("batchMsg", "✓ Batch " + id + " saved");
-      ["b_id","b_spawn","b_substrate","b_date","b_bags","b_notes"].forEach(f => document.getElementById(f).value = "");
-      loadBatchTable();
-    })
-    .catch(err => showMsg("batchMsg", "✗ " + err.message));
+  const id=document.getElementById("b_id").value.trim(),spawn=document.getElementById("b_spawn").value.trim(),substrate=document.getElementById("b_substrate").value.trim(),date=document.getElementById("b_date").value,bags=parseInt(document.getElementById("b_bags").value),notes=document.getElementById("b_notes").value.trim();
+  if(!id||!spawn||!substrate||!date||isNaN(bags)){showMsg("batchMsg","✗ Fill all required fields");return;}
+  db.ref("farm/batches/"+id).set({id,spawn,substrate,date,bags,notes,createdAt:new Date().toISOString()})
+    .then(()=>{showMsg("batchMsg","✓ Batch "+id+" saved");["b_id","b_spawn","b_substrate","b_date","b_bags","b_notes"].forEach(f=>document.getElementById(f).value="");loadBatchTable();})
+    .catch(e=>showMsg("batchMsg","✗ "+e.message));
 }
-
 function loadBatchTable() {
-  db.ref("farm/batches").once("value", snap => {
-    const tbody = document.getElementById("batchTableBody");
-    tbody.innerHTML = "";
-    if (!snap.exists()) return;
-    Object.values(snap.val())
-      .sort((a,b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
-      .forEach(r => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td><span class="badge badge-spawn">${r.id}</span></td><td>${r.spawn}</td><td>${r.substrate}</td><td>${r.date}</td><td>${r.bags}</td><td>${r.notes||'—'}</td>`;
-        tbody.appendChild(tr);
-      });
+  db.ref("farm/batches").once("value",snap=>{
+    const tbody=document.getElementById("batchTableBody"); tbody.innerHTML="";
+    if(!snap.exists())return;
+    Object.values(snap.val()).sort((a,b)=>(b.createdAt??'').localeCompare(a.createdAt??'')).forEach(r=>{
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td><span class="badge badge-spawn">${r.id}</span></td><td>${r.spawn}</td><td>${r.substrate}</td><td>${r.date}</td><td>${r.bags}</td><td>${r.notes||'—'}</td>`;
+      tbody.appendChild(tr);
+    });
   });
 }
-
 function exportBatchCSV() {
-  db.ref("farm/batches").once("value", snap => {
-    if (!snap.exists()) { alert("No batch records found"); return; }
-    const rows = [["Batch ID","Spawn Type","Substrate","Spawn Date","No. of Bags","Notes"]];
-    Object.values(snap.val())
-      .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
-      .forEach(r => rows.push([r.id, r.spawn, r.substrate, r.date, r.bags, r.notes||'']));
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [14,16,16,14,12,30].map(w => ({ wch:w }));
-    styleHeader(ws, rows[0].length);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Batch Info");
-    downloadXLSX(wb, "batch_info.xlsx");
+  db.ref("farm/batches").once("value",snap=>{
+    if(!snap.exists()){alert("No batch records");return;}
+    const rows=[["Batch ID","Spawn Type","Substrate","Spawn Date","No. of Bags","Notes"]];
+    Object.values(snap.val()).sort((a,b)=>(a.date??'').localeCompare(b.date??'')).forEach(r=>rows.push([r.id,r.spawn,r.substrate,r.date,r.bags,r.notes||'']));
+    const ws=XLSX.utils.aoa_to_sheet(rows); ws["!cols"]=[14,16,16,14,12,30].map(w=>({wch:w})); styleHeader(ws,rows[0].length);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Batch Info"); downloadXLSX(wb,"batch_info.xlsx");
   });
 }
 
-/* ── HARVEST CRUD ── */
+/* ── HARVEST CRUD ───────────────────────────────────────── */
 function saveHarvest() {
-  const batchId = document.getElementById("h_batchId").value.trim();
-  const flush   = parseInt(document.getElementById("h_flush").value);
-  const date    = document.getElementById("h_date").value;
-  const yield_g = parseFloat(document.getElementById("h_yield").value);
-  const notes   = document.getElementById("h_notes").value.trim();
-
-  if (!batchId || isNaN(flush) || !date || isNaN(yield_g)) {
-    showMsg("harvestMsg", "✗ Fill all required fields"); return;
-  }
-
-  const key    = batchId + "_F" + flush;
-  const record = { batchId, flush, date, yield_g, notes, createdAt: new Date().toISOString() };
-  db.ref("farm/harvests/" + key).set(record)
-    .then(() => {
-      showMsg("harvestMsg", "✓ Harvest saved");
-      ["h_batchId","h_flush","h_date","h_yield","h_notes"].forEach(f => document.getElementById(f).value = "");
-      loadHarvestTable();
-    })
-    .catch(err => showMsg("harvestMsg", "✗ " + err.message));
+  const batchId=document.getElementById("h_batchId").value.trim(),flush=parseInt(document.getElementById("h_flush").value),date=document.getElementById("h_date").value,yield_g=parseFloat(document.getElementById("h_yield").value),notes=document.getElementById("h_notes").value.trim();
+  if(!batchId||isNaN(flush)||!date||isNaN(yield_g)){showMsg("harvestMsg","✗ Fill all required fields");return;}
+  db.ref("farm/harvests/"+batchId+"_F"+flush).set({batchId,flush,date,yield_g,notes,createdAt:new Date().toISOString()})
+    .then(()=>{showMsg("harvestMsg","✓ Harvest saved");["h_batchId","h_flush","h_date","h_yield","h_notes"].forEach(f=>document.getElementById(f).value="");loadHarvestTable();})
+    .catch(e=>showMsg("harvestMsg","✗ "+e.message));
 }
-
 function loadHarvestTable() {
-  db.ref("farm/harvests").once("value", snap => {
-    const tbody = document.getElementById("harvestTableBody");
-    tbody.innerHTML = "";
-    if (!snap.exists()) return;
-    Object.values(snap.val())
-      .sort((a,b) => (b.date ?? '').localeCompare(a.date ?? ''))
-      .forEach(r => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td><span class="badge badge-harvest">${r.batchId}</span></td><td>Flush ${r.flush}</td><td>${r.date}</td><td>${r.yield_g} g</td><td>${r.notes||'—'}</td>`;
-        tbody.appendChild(tr);
-      });
+  db.ref("farm/harvests").once("value",snap=>{
+    const tbody=document.getElementById("harvestTableBody"); tbody.innerHTML="";
+    if(!snap.exists())return;
+    Object.values(snap.val()).sort((a,b)=>(b.date??'').localeCompare(a.date??'')).forEach(r=>{
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td><span class="badge badge-harvest">${r.batchId}</span></td><td>Flush ${r.flush}</td><td>${r.date}</td><td>${r.yield_g} g</td><td>${r.notes||'—'}</td>`;
+      tbody.appendChild(tr);
+    });
   });
 }
-
 function exportHarvestCSV() {
-  db.ref("farm/harvests").once("value", snap => {
-    if (!snap.exists()) { alert("No harvest records found"); return; }
-    const rows = [["Batch ID","Flush No.","Harvest Date","Yield (g)","Notes"]];
-    Object.values(snap.val())
-      .sort((a,b) => (a.date ?? '').localeCompare(b.date ?? ''))
-      .forEach(r => rows.push([r.batchId, "Flush " + r.flush, r.date, r.yield_g, r.notes||'']));
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws["!cols"] = [14,12,14,12,30].map(w => ({ wch:w }));
-    styleHeader(ws, rows[0].length);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Harvest Log");
-    downloadXLSX(wb, "harvest_log.xlsx");
+  db.ref("farm/harvests").once("value",snap=>{
+    if(!snap.exists()){alert("No harvest records");return;}
+    const rows=[["Batch ID","Flush No.","Harvest Date","Yield (g)","Notes"]];
+    Object.values(snap.val()).sort((a,b)=>(a.date??'').localeCompare(b.date??'')).forEach(r=>rows.push([r.batchId,"Flush "+r.flush,r.date,r.yield_g,r.notes||'']));
+    const ws=XLSX.utils.aoa_to_sheet(rows); ws["!cols"]=[14,12,14,12,30].map(w=>({wch:w})); styleHeader(ws,rows[0].length);
+    const wb=XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb,ws,"Harvest Log"); downloadXLSX(wb,"harvest_log.xlsx");
   });
 }
 
-/* ── CONTROLS ── */
-function motorOn() {
-  db.ref("esp32/control").update({ manual_override:true, manual_state:true });
-  showMsg("ctrlMsg","Override → ON sent");
-}
-function motorOff() {
-  db.ref("esp32/control").update({ manual_override:true, manual_state:false });
-  showMsg("ctrlMsg","Override → OFF sent");
-}
-function motorAuto() {
-  db.ref("esp32/control").update({ manual_override:false, manual_state:false });
-  showMsg("ctrlMsg","Auto mode restored");
-}
+/* ── CONTROLS ───────────────────────────────────────────── */
+function motorOn()   { db.ref("esp32/control").update({manual_override:true, manual_state:true });  showMsg("ctrlMsg","Override → ON sent"); }
+function motorOff()  { db.ref("esp32/control").update({manual_override:true, manual_state:false}); showMsg("ctrlMsg","Override → OFF sent"); }
+function motorAuto() { db.ref("esp32/control").update({manual_override:false,manual_state:false}); showMsg("ctrlMsg","Auto mode restored"); }
 
 function updateLimits() {
-  const low  = parseFloat(document.getElementById("inp_humLow").value);
-  const high = parseFloat(document.getElementById("inp_humHigh").value);
-  if (isNaN(low) || isNaN(high))     { showMsg("limMsg","Enter valid numbers"); return; }
-  if (low >= high)                    { showMsg("limMsg","Low must be < High");  return; }
-  if (low < 10 || high > 99)         { showMsg("limMsg","Values 10–99%");        return; }
-  Promise.all([
-    db.ref("esp32/control/humidity_low").set(low),
-    db.ref("esp32/control/humidity_high").set(high)
-  ]).then(() => showMsg("limMsg", `✓ ${low}% – ${high}%`))
-    .catch(e  => showMsg("limMsg", "✗ " + e.message));
+  const low=parseFloat(document.getElementById("inp_humLow").value),high=parseFloat(document.getElementById("inp_humHigh").value);
+  if(isNaN(low)||isNaN(high)){showMsg("limMsg","Enter valid numbers");return;}
+  if(low>=high){showMsg("limMsg","Low must be < High");return;}
+  if(low<10||high>99){showMsg("limMsg","Values 10–99%");return;}
+  Promise.all([db.ref("esp32/control/humidity_low").set(low),db.ref("esp32/control/humidity_high").set(high)])
+    .then(()=>showMsg("limMsg",`✓ ${low}% – ${high}%`)).catch(e=>showMsg("limMsg","✗ "+e.message));
 }
-
 function updateTiming() {
-  const r = parseInt(document.getElementById("inp_minRun").value);
-  const o = parseInt(document.getElementById("inp_minOff").value);
-  if (isNaN(r) || isNaN(o) || r < 1 || o < 1) { showMsg("timMsg","Invalid values"); return; }
-  Promise.all([
-    db.ref("esp32/control/min_run_time").set(r),
-    db.ref("esp32/control/min_off_time").set(o)
-  ]).then(() => showMsg("timMsg", `✓ Run ${r}s · Off ${o}s`))
-    .catch(e  => showMsg("timMsg", "✗ " + e.message));
+  const r=parseInt(document.getElementById("inp_minRun").value),o=parseInt(document.getElementById("inp_minOff").value);
+  if(isNaN(r)||isNaN(o)||r<1||o<1){showMsg("timMsg","Invalid values");return;}
+  Promise.all([db.ref("esp32/control/min_run_time").set(r),db.ref("esp32/control/min_off_time").set(o)])
+    .then(()=>showMsg("timMsg",`✓ Run ${r}s · Off ${o}s`)).catch(e=>showMsg("timMsg","✗ "+e.message));
 }
-
 function updateMaxRun() {
-  const v = parseInt(document.getElementById("inp_maxRun").value);
-  if (isNaN(v) || v < 10) { showMsg("maxMsg","Min 10s"); return; }
-  db.ref("esp32/control/max_run_time").set(v)
-    .then(() => showMsg("maxMsg", `✓ Cutoff ${v}s`))
-    .catch(e  => showMsg("maxMsg", "✗ " + e.message));
+  const v=parseInt(document.getElementById("inp_maxRun").value);
+  if(isNaN(v)||v<10){showMsg("maxMsg","Min 10s");return;}
+  db.ref("esp32/control/max_run_time").set(v).then(()=>showMsg("maxMsg",`✓ Cutoff ${v}s`)).catch(e=>showMsg("maxMsg","✗ "+e.message));
 }
 
-/* ── NAV  FIX: pass button ref explicitly so event.target quirks don't matter ── */
+/* ── NAV ────────────────────────────────────────────────── */
 function showPage(btn, name) {
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-  document.querySelectorAll(".nav-tab").forEach(t => t.classList.remove("active"));
-  document.getElementById("page-" + name).classList.add("active");
+  document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
+  document.querySelectorAll(".nav-tab").forEach(t=>t.classList.remove("active"));
+  document.getElementById("page-"+name).classList.add("active");
   btn.classList.add("active");
-
-  if (name === "production") {
-    initCharts();
-    if (document.getElementById("chartDate").value) loadChartData();
-  }
-  if (name === "batch")   loadBatchTable();
-  if (name === "harvest") loadHarvestTable();
+  if(name==="production"){ initCharts(); if(document.getElementById("chartDate").value) loadChartData(); }
+  if(name==="batch")   loadBatchTable();
+  if(name==="harvest") loadHarvestTable();
 }
 
-/* ── HELPERS ── */
-function setText(id, val) { document.getElementById(id).innerText = val; }
-
-function flagCard(id, val, warn, danger) {
-  const el = document.getElementById(id);
-  el.classList.remove("warn","alert");
-  if (val === null) return;
-  if (val > danger || val < (warn - 10)) el.classList.add("alert");
-  else if (val > warn)                    el.classList.add("warn");
+/* ── HELPERS ────────────────────────────────────────────── */
+function setText(id,val){ const el=document.getElementById(id); if(el) el.innerText=val; }
+function flagCard(id,val,warn,danger){
+  const el=document.getElementById(id); el.classList.remove("warn","alert");
+  if(val===null)return;
+  if(val>danger||val<(warn-10)) el.classList.add("alert");
+  else if(val>warn)              el.classList.add("warn");
 }
-
-function showMsg(id, text) {
-  const el = document.getElementById(id);
-  el.innerText = text;
-  el.classList.add("show");
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove("show"), 3500);
+function showMsg(id,text){
+  const el=document.getElementById(id);
+  el.innerText=text; el.classList.add("show"); clearTimeout(el._t);
+  el._t=setTimeout(()=>el.classList.remove("show"),3500);
 }
-
-function markUpdate() {
-  document.getElementById("lastUpdate").innerText = new Date().toLocaleTimeString();
-}
-
-let heartbeatTimer = null;
-function resetHeartbeatTimer() {
-  clearTimeout(heartbeatTimer);
-  heartbeatTimer = setTimeout(() => setWifi(false), 25000);
-}
-function setWifi(on) {
-  document.getElementById("wifiStatus").className = on ? "online" : "";
-  document.getElementById("wifiLabel").innerText  = on ? "online" : "offline";
-}
-
-function clockTick() {
-  document.getElementById("footerTime").innerText = new Date().toLocaleString();
-  setTimeout(clockTick, 1000);
-}
-
-function setTodayDate() {
-  const today = new Date().toISOString().split("T")[0];
-  document.getElementById("chartDate").value = today;
-  document.getElementById("b_date").value    = today;
-  document.getElementById("h_date").value    = today;
+function markUpdate(){ document.getElementById("lastUpdate").innerText=new Date().toLocaleTimeString(); }
+let heartbeatTimer=null;
+function resetHeartbeatTimer(){ clearTimeout(heartbeatTimer); heartbeatTimer=setTimeout(()=>setWifi(false),25000); }
+function setWifi(on){ document.getElementById("wifiStatus").className=on?"online":""; document.getElementById("wifiLabel").innerText=on?"online":"offline"; }
+function clockTick(){ document.getElementById("footerTime").innerText=new Date().toLocaleString(); setTimeout(clockTick,1000); }
+function setTodayDate(){
+  const t=new Date().toISOString().split("T")[0];
+  document.getElementById("chartDate").value=t;
+  document.getElementById("b_date").value=t;
+  document.getElementById("h_date").value=t;
 }
 </script>
 </body>
