@@ -137,7 +137,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 /* CHART */
 .chart-wrap{background:var(--panel);border:1px solid var(--border);padding:20px;margin-top:12px;position:relative}
 .chart-wrap canvas{max-height:280px}
-/* Shorter canvas for the square-wave chart — it only has 2 states */
 .chart-wrap.chart-sq canvas{max-height:180px}
 
 .chart-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
@@ -145,7 +144,6 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .chart-toolbar input[type=date]{padding:6px 10px;background:#0d1810;border:1px solid var(--border);color:var(--text);font-family:var(--font-mono);font-size:.8rem;outline:none}
 .chart-toolbar input[type=date]:focus{border-color:var(--accent)}
 
-/* Chart header with stat pills */
 .chart-header{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .chart-title{font-family:var(--font-mono);font-size:.65rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
 .chart-stats{display:flex;gap:8px;flex-wrap:wrap}
@@ -154,6 +152,10 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .stat-pill.green span{color:var(--accent)}
 .stat-pill.amber span{color:var(--warn)}
 .stat-pill.blue  span{color:var(--accent2)}
+
+/* live indicator on motor chart */
+.live-badge{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-mono);font-size:.6rem;color:var(--accent);padding:2px 8px;border:1px solid var(--accent);border-radius:2px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);animation:pulse 1.4s infinite}
 
 /* DATA RECORDS TABLE */
 .records-table{width:100%;border-collapse:collapse;font-family:var(--font-mono);font-size:.72rem;margin-top:12px}
@@ -335,19 +337,24 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <canvas id="chartMQ"></canvas>
     </div>
 
-    <!-- 4. Humidifier square-wave — NOW REAL-TIME EVENTS ═══════════════════════════════════════ -->
+    <!-- 4. Humidifier square-wave — REAL-TIME EVENTS ══════ -->
     <div class="chart-wrap chart-sq" style="margin-top:12px;">
       <div class="chart-header">
-        <div class="chart-title">HUMIDIFIER STATE — real-time square wave (ON = 1, OFF = 0) [events-based]</div>
-        <div class="chart-stats">
-          <div class="stat-pill green">Total ON <span id="stat_motorTotal">--</span></div>
-          <div class="stat-pill amber">Cycles <span id="stat_motorCycles">--</span></div>
-          <div class="stat-pill blue">Avg run <span id="stat_motorAvgRun">--</span></div>
+        <div class="chart-title">HUMIDIFIER STATE — real-time square wave (ON=1, OFF=0)</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+          <div class="chart-stats">
+            <div class="stat-pill green">Total ON <span id="stat_motorTotal">--</span></div>
+            <div class="stat-pill amber">Cycles <span id="stat_motorCycles">--</span></div>
+            <div class="stat-pill blue">Avg run <span id="stat_motorAvgRun">--</span></div>
+          </div>
+          <div class="live-badge" id="motorLiveBadge" style="display:none;">
+            <div class="live-dot"></div>LIVE
+          </div>
         </div>
       </div>
       <canvas id="chartMotor"></canvas>
       <div style="font-family:var(--font-mono);font-size:.62rem;color:var(--muted);margin-top:8px;text-align:center;">
-        Data source: real-time motor ON/OFF events from esp32/motor/events/ — NOT 15-min averages
+        Real-time events from <code>esp32/Motor/events/</code> — updates instantly on every ON/OFF transition
       </div>
     </div>
 
@@ -511,6 +518,7 @@ function login() {
 function logout() {
   if (!confirm("Log out?")) return;
   db.ref("esp32").off();
+  stopMotorEventListener();
   auth.signOut().then(() => {
     document.getElementById("dashboard").style.display = "none";
     document.getElementById("loginBox").style.display  = "flex";
@@ -637,172 +645,198 @@ function startListeners() {
 }
 
 /* ══════════════════════════════════════════════════════════
-   REAL-TIME MOTOR EVENT SQUARE WAVE BUILDER
+   MOTOR EVENT SYSTEM
    ══════════════════════════════════════════════════════════
-   This fetches all motor ON/OFF events from Firebase and
-   reconstructs the precise timing square wave.
+   Key design:
+   - motorEventsCache  : holds ALL loaded events for the
+     currently selected date, keyed by epochMs string
+   - motorEventListener: the active Firebase .on() handle —
+     detached and re-attached on date change
+   - On date load: fetch all existing events via .once(),
+     then attach child_added listener for new ones
+   - child_added fires for existing AND new children, so
+     we use a "loaded" flag to ignore the initial dump and
+     only react to genuinely new events after load
    ══════════════════════════════════════════════════════════ */
 
-async function fetchMotorEventsForDate(dateStr) {
+let motorEventsCache   = {};    // epochMs(str) → {state,ts,epoch,epochMs}
+let motorEventRef      = null;  // Firebase ref with date range query
+let motorListenerActive = false;
+let motorListenerDate  = "";    // date currently being listened to
+let motorLoadComplete  = false; // true once initial dump is consumed
+
+function stopMotorEventListener() {
+  if (motorEventRef && motorListenerActive) {
+    motorEventRef.off();
+    motorListenerActive = false;
+    console.log("Motor event listener detached");
+  }
+  motorEventsCache   = {};
+  motorLoadComplete  = false;
+  motorListenerDate  = "";
+}
+
+function startMotorEventListener(dateStr) {
+  /* Detach any existing listener first */
+  stopMotorEventListener();
+  motorListenerDate = dateStr;
+
+  /* Compute day boundaries (local time, same as ESP32 IST midnight) */
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dayStart  = new Date(y, m - 1, d).getTime();
+  const dayEnd    = new Date(y, m - 1, d + 1).getTime();
+
   /*
-   * Fetch esp32/motor/eventIndex to get all event keys for the date.
-   * Each key is an epochMs timestamp in milliseconds.
-   * We filter for events within [dateStart, dateEnd] in UTC.
+   * Query events for this date.
+   * The key is epochMs as a numeric string — Firebase orders
+   * children by key by default, and epochMs strings sort
+   * correctly because they are all the same length (13 digits).
    */
-  return new Promise((resolve) => {
-    db.ref("esp32/motor/eventIndex").once("value", snap => {
-      if (!snap.exists()) {
-        resolve([]);
-        return;
-      }
+  motorEventRef = db.ref("esp32/Motor/events")
+    .orderByChild("epochMs")
+    .startAt(dayStart)
+    .endAt(dayEnd - 1);
 
-      const allEvents = snap.val();
-      const keys = Object.keys(allEvents);
-
-      // Parse the selected date to get start/end of day (UTC)
-      const [y, m, d] = dateStr.split('-');
-      const dayStart = new Date(y, m - 1, d);
-      const dayEnd   = new Date(y, m - 1, d + 1);
-      const msStart  = dayStart.getTime();
-      const msEnd    = dayEnd.getTime();
-
-      // Filter events for this date
-      const dayEvents = [];
-      keys.forEach(key => {
-        const ms = parseInt(key, 10);
-        if (!isNaN(ms) && ms >= msStart && ms < msEnd) {
-          const evt = allEvents[key];
-          dayEvents.push({
-            epochMs: ms,
-            state: evt.state,
-            ts: evt.ts
-          });
-        }
+  /*
+   * Step 1: Load all existing events via .once() so we have
+   * a complete baseline before attaching the live listener.
+   * This avoids the child_added "initial dump" problem.
+   */
+  motorEventRef.once("value", snap => {
+    motorEventsCache = {};
+    if (snap.exists()) {
+      snap.forEach(child => {
+        const v = child.val();
+        motorEventsCache[String(v.epochMs || child.key)] = v;
       });
+    }
+    console.log(`Motor events loaded for ${dateStr}: ${Object.keys(motorEventsCache).length} events`);
+    motorLoadComplete = true;
+    rebuildMotorChart(dateStr);
 
-      // Sort by timestamp
-      dayEvents.sort((a, b) => a.epochMs - b.epochMs);
-      resolve(dayEvents);
+    /*
+     * Step 2: Now attach child_added for real-time updates.
+     * Since we already loaded everything, child_added will only
+     * fire for NEW events written after this point.
+     * We use .limitToLast(1) pattern to avoid re-firing old ones,
+     * but more reliably we track which keys we've seen.
+     */
+    motorEventRef.on("child_added", snap => {
+      if (!motorLoadComplete) return; // safety guard
+      const v   = snap.val();
+      const key = String(v.epochMs || snap.key);
+
+      /* Skip if already in cache (initial dump race condition guard) */
+      if (motorEventsCache[key]) return;
+
+      motorEventsCache[key] = v;
+      console.log(`New motor event received: ${v.state} @ ${v.ts}`);
+
+      /* Only redraw if this event belongs to the currently shown date */
+      if (motorListenerDate === dateStr) {
+        rebuildMotorChart(dateStr);
+      }
     });
+
+    motorListenerActive = true;
+    document.getElementById("motorLiveBadge").style.display = "inline-flex";
   });
 }
 
-function buildSquareWaveFromEvents(events, dateStr) {
-  /*
-   * Build an array of {time, state} transitions for the square wave.
-   * Also compute total ON time and cycle count.
-   *
-   * Algorithm:
-   *   - For each event, record the transition point
-   *   - State alternates ON/OFF based on event data
-   *   - Interpolate the square wave across the entire 24h period
-   *     by inserting points at start-of-day and end-of-day
-   */
+/* ══════════════════════════════════════════════════════════
+   REBUILD MOTOR CHART from motorEventsCache
+   ══════════════════════════════════════════════════════════ */
+function rebuildMotorChart(dateStr) {
+  if (!chartMotor) return;
+
+  const events = Object.values(motorEventsCache)
+    .sort((a, b) => (a.epochMs || 0) - (b.epochMs || 0));
 
   if (events.length === 0) {
-    // No events → return empty square wave
-    return { times: [], states: [], totalOnMs: 0, cycleCount: 0 };
+    chartMotor.data.labels             = ["00:00", "23:59"];
+    chartMotor.data.datasets[0].data   = [0, 0];
+    chartMotor.data.datasets[1].data   = [0, 0];
+    chartMotor.update("none");
+    setText("stat_motorTotal",  "--");
+    setText("stat_motorCycles", "--");
+    setText("stat_motorAvgRun", "--");
+    return;
   }
 
-  const [y, m, d] = dateStr.split('-');
-  const dayStart = new Date(y, m - 1, d).getTime();
-  const dayEnd   = new Date(y, m - 1, d + 1).getTime();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  const dayStart  = new Date(y, m - 1, d).getTime();
+  const dayEnd    = new Date(y, m - 1, d + 1).getTime();
 
-  // Assume the motor started OFF at the beginning of the day
-  // (unless the first event says otherwise)
-  const transitions = [];
-  let lastState = false; // starts OFF
+  const msToHHMM = ms => {
+    const dt  = new Date(ms);
+    const hh  = String(dt.getHours()).padStart(2,'0');
+    const min = String(dt.getMinutes()).padStart(2,'0');
+    const sec = String(dt.getSeconds()).padStart(2,'0');
+    return `${hh}:${min}:${sec}`;
+  };
+
+  /* Build square-wave point array */
+  const labels      = [];
+  const squareData  = [];
+  const barData     = [];
+
+  /* Start-of-day anchor at OFF */
+  labels.push(msToHHMM(dayStart));
+  squareData.push(0);
+  barData.push(null);
+
+  let totalOnMs  = 0;
+  let cycleCount = 0;
+  let prevMs     = null;
+  let prevState  = false;
 
   events.forEach((evt, idx) => {
     const isOn = evt.state === "ON";
-    transitions.push({
-      ms: evt.epochMs,
-      state: isOn
-    });
-    lastState = isOn;
-  });
+    const ms   = Number(evt.epochMs);
 
-  // Compute total ON time and cycle count
-  let totalOnMs = 0;
-  let cycleCount = 0;
-  let wasOn = false;
+    /* For a step chart we need two points per transition:
+       one just before (holding old state) and one at the event
+       Actually Chart.js stepped:'before' handles this — we just
+       need to push the new state at the event time. */
+    labels.push(msToHHMM(ms));
+    squareData.push(isOn ? 1 : 0);
 
-  transitions.forEach((trans, idx) => {
-    const nextMs = idx + 1 < transitions.length ? transitions[idx + 1].ms : dayEnd;
-    const durationMs = nextMs - trans.ms;
-
-    if (trans.state) {
-      totalOnMs += durationMs;
-      if (!wasOn) cycleCount++; // new ON cycle starting
+    /* Bar: duration of the preceding segment if it was ON */
+    if (prevMs !== null && prevState) {
+      totalOnMs += (ms - prevMs);
+      const dur = Math.round((ms - prevMs) / 1000);
+      barData.push(dur);
+    } else {
+      barData.push(null);
     }
-    wasOn = trans.state;
+
+    if (isOn && !prevState) cycleCount++;
+    prevMs    = ms;
+    prevState = isOn;
   });
 
-  // If still ON at end of day, it contributes to ON time
-  if (lastState) {
-    totalOnMs += (dayEnd - transitions[transitions.length - 1].ms);
+  /* End-of-day anchor */
+  const nowMs = Math.min(Date.now(), dayEnd);
+  labels.push(msToHHMM(nowMs));
+  squareData.push(prevState ? 1 : 0);
+  if (prevState && prevMs !== null) {
+    totalOnMs += (nowMs - prevMs);
+    barData.push(Math.round((nowMs - prevMs) / 1000));
+  } else {
+    barData.push(null);
   }
 
-  return {
-    transitions,
-    dayStart,
-    dayEnd,
-    totalOnMs,
-    cycleCount
-  };
-}
+  chartMotor.data.labels           = labels;
+  chartMotor.data.datasets[0].data = barData;
+  chartMotor.data.datasets[1].data = squareData;
+  chartMotor.update("none"); // "none" = no animation, instant redraw
 
-function formatSquareWaveChart(transitions, dayStart, dayEnd) {
-  /*
-   * Convert transitions into chart labels and data arrays.
-   * We create a point for each transition, plus interpolate
-   * the square wave across the day.
-   */
-
-  if (transitions.length === 0) {
-    // No data — return empty arrays
-    return { labels: ["00:00", "23:59"], squareData: [0, 0], durationData: [0, 0] };
-  }
-
-  const labels = [];
-  const squareData = [];
-  const durationData = [];
-
-  // Helper to format ms as HH:MM
-  const msToTime = (ms) => {
-    const d = new Date(ms);
-    const h = String(d.getHours()).padStart(2, '0');
-    const min = String(d.getMinutes()).padStart(2, '0');
-    return `${h}:${min}`;
-  };
-
-  // Start the day at OFF
-  labels.push(msToTime(dayStart));
-  squareData.push(0);
-  durationData.push(0);
-
-  // Add each transition
-  transitions.forEach((trans) => {
-    const time = msToTime(trans.ms);
-    labels.push(time);
-    squareData.push(trans.state ? 1 : 0);
-    durationData.push(trans.state ? 120 : 0); // placeholder duration
-  });
-
-  // If the last transition was ON, extend to end of day
-  // If OFF, add the final OFF point at end of day
-  if (transitions.length > 0 && transitions[transitions.length - 1].state) {
-    labels.push(msToTime(dayEnd));
-    squareData.push(1);
-    durationData.push(0);
-  } else if (transitions.length > 0) {
-    // Already OFF, but add end-of-day marker
-    labels.push(msToTime(dayEnd));
-    squareData.push(0);
-    durationData.push(0);
-  }
-
-  return { labels, squareData, durationData };
+  /* Stats */
+  const totalSec = Math.round(totalOnMs / 1000);
+  const avgRun   = cycleCount > 0 ? Math.round(totalSec / cycleCount) : null;
+  setText("stat_motorTotal",  _fmtS(totalSec));
+  setText("stat_motorCycles", cycleCount > 0 ? cycleCount : "--");
+  setText("stat_motorAvgRun", _fmtS(avgRun));
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -839,6 +873,7 @@ function destroyCharts() {
   [chartTemp, chartHum, chartMQ, chartMotor, chartLux].forEach(c => { if(c) c.destroy(); });
   chartTemp=chartHum=chartMQ=chartMotor=chartLux=null;
   chartsInited=false;
+  stopMotorEventListener();
 }
 
 function initCharts() {
@@ -860,11 +895,7 @@ function initCharts() {
     { label:"MQ135 Outside", data:[], borderColor:"#ffa07a", backgroundColor:"rgba(255,160,122,.05)", tension:.3, pointRadius:2 }
   ]);
 
-  /* ── MOTOR SQUARE WAVE ────────────────────────────────
-     Real-time events-based square wave with two layers:
-     Layer 1 (bar): duration of each ON period
-     Layer 2 (step line): the square wave itself (0=OFF, 1=ON)
-  ──────────────────────────────────────────────────────── */
+  /* ── MOTOR SQUARE WAVE ──────────────────────────────── */
   const motorCtx = document.getElementById("chartMotor").getContext("2d");
   chartMotor = new Chart(motorCtx, {
     data: {
@@ -904,6 +935,7 @@ function initCharts() {
     },
     options: {
       responsive: true,
+      animation: false,   /* disable animation for instant live updates */
       interaction: { mode:'index', intersect:false },
       plugins: {
         legend: _legend,
@@ -911,7 +943,7 @@ function initCharts() {
           callbacks: {
             label: ctx => {
               if (ctx.dataset.type === 'bar')
-                return `  ON: ${ctx.parsed.y}s`;
+                return ctx.parsed.y !== null ? `  ON: ${ctx.parsed.y}s` : '';
               return `  State: ${ctx.parsed.y === 1 ? '🟢 ON' : '🔴 OFF'}`;
             }
           }
@@ -979,76 +1011,50 @@ function _fmtS(s) {
   return Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s';
 }
 
-async function loadChartData() {
+/* ── Main chart loader (sensor data + kicks off motor listener) ── */
+function loadChartData() {
   const dateStr = document.getElementById("chartDate").value;
   if (!dateStr) { alert("Select a date first"); return; }
 
-  // Load sensor data from production logs (same as before)
+  /* Sensor data from 15-min production logs */
   db.ref("esp32/logs/" + dateStr).once("value", snap => {
-    if (!snap.exists()) {
-      alert("No sensor data for " + dateStr);
-      // Still try to load motor events
-      loadMotorEventsChart(dateStr);
-      return;
+    if (snap.exists()) {
+      const raw  = snap.val();
+      const keys = Object.keys(raw).sort();
+      const labels=[], tIn=[], tOut=[], hIn=[], hOut=[];
+      const mqIn=[], mqOut=[], luxArr=[];
+
+      keys.forEach(k => {
+        const r = raw[k];
+        labels.push(k.replace("-",":"));
+        tIn.push(r.tempIn   ?? null);
+        tOut.push(r.tempOut ?? null);
+        hIn.push(r.humIn    ?? null);
+        hOut.push(r.humOut  ?? null);
+        mqIn.push(r.mqIn    ?? null);
+        mqOut.push(r.mqOut  ?? null);
+        luxArr.push(r.lux   ?? null);
+      });
+
+      const upd = (chart, lbl, ...ds) => {
+        chart.data.labels = lbl;
+        ds.forEach((d,i) => chart.data.datasets[i].data = d);
+        chart.update();
+      };
+      upd(chartTemp, labels, tIn, tOut);
+      upd(chartHum,  labels, hIn, hOut);
+      upd(chartMQ,   labels, mqIn, mqOut);
+      upd(chartLux,  labels, luxArr);
+      computeSensorStats(tIn, tOut, hIn, hOut, mqIn, mqOut, luxArr);
     }
-
-    const raw  = snap.val();
-    const keys = Object.keys(raw).sort();
-
-    const labels=[], tIn=[], tOut=[], hIn=[], hOut=[];
-    const mqIn=[], mqOut=[], luxArr=[];
-
-    keys.forEach(k => {
-      const r = raw[k];
-      labels.push(k.replace("-",":"));
-      tIn.push(r.tempIn   ?? null);
-      tOut.push(r.tempOut ?? null);
-      hIn.push(r.humIn    ?? null);
-      hOut.push(r.humOut  ?? null);
-      mqIn.push(r.mqIn    ?? null);
-      mqOut.push(r.mqOut  ?? null);
-      luxArr.push(r.lux   ?? null);
-    });
-
-    const upd = (chart, lbl, ...ds) => {
-      chart.data.labels = lbl;
-      ds.forEach((d,i) => chart.data.datasets[i].data = d);
-      chart.update();
-    };
-    upd(chartTemp, labels, tIn, tOut);
-    upd(chartHum,  labels, hIn, hOut);
-    upd(chartMQ,   labels, mqIn, mqOut);
-    upd(chartLux,  labels, luxArr);
-
-    computeSensorStats(tIn, tOut, hIn, hOut, mqIn, mqOut, luxArr);
   });
 
-  // Load motor events separately (real-time, not from production logs)
-  loadMotorEventsChart(dateStr);
-}
-
-async function loadMotorEventsChart(dateStr) {
   /*
-   * Fetch motor events for the selected date and render
-   * the real-time square wave chart.
+   * Motor events: start a real-time listener.
+   * If the date hasn't changed, the listener is already running —
+   * startMotorEventListener() is smart enough to detach and reattach.
    */
-  const events = await fetchMotorEventsForDate(dateStr);
-  const { transitions, dayStart, dayEnd, totalOnMs, cycleCount } = buildSquareWaveFromEvents(events, dateStr);
-  const { labels, squareData, durationData } = formatSquareWaveChart(transitions, dayStart, dayEnd);
-
-  // Update motor chart
-  chartMotor.data.labels = labels;
-  chartMotor.data.datasets[0].data = durationData;  // bar: durations
-  chartMotor.data.datasets[1].data = squareData;    // line: state
-  chartMotor.update();
-
-  // Update motor stats
-  const totalSec = Math.round(totalOnMs / 1000);
-  const avgRun = cycleCount > 0 ? Math.round(totalSec / cycleCount) : null;
-
-  setText("stat_motorTotal",  _fmtS(totalSec));
-  setText("stat_motorCycles", cycleCount > 0 ? cycleCount : '--');
-  setText("stat_motorAvgRun", _fmtS(avgRun));
+  startMotorEventListener(dateStr);
 }
 
 function computeSensorStats(tIn, tOut, hIn, hOut, mqIn, mqOut, luxArr) {
@@ -1058,7 +1064,6 @@ function computeSensorStats(tIn, tOut, hIn, hOut, mqIn, mqOut, luxArr) {
   setText("stat_hOutAvg",  _sf(_avg(hOut)));
   setText("stat_mqInAvg",  _sf(_avg(mqIn),  0));
   setText("stat_mqOutAvg", _sf(_avg(mqOut), 0));
-
   const vLux   = luxArr.filter(v=>v!==null&&!isNaN(v));
   const maxLux = vLux.length ? Math.round(Math.max(...vLux)) : null;
   setText("stat_luxMax", maxLux!==null ? maxLux : '--');
@@ -1219,7 +1224,11 @@ function showPage(btn, name) {
   document.querySelectorAll(".nav-tab").forEach(t=>t.classList.remove("active"));
   document.getElementById("page-"+name).classList.add("active");
   btn.classList.add("active");
-  if(name==="production"){ initCharts(); if(document.getElementById("chartDate").value) loadChartData(); }
+  if(name==="production"){
+    initCharts();
+    const d = document.getElementById("chartDate").value;
+    if(d) loadChartData();
+  }
   if(name==="batch")   loadBatchTable();
   if(name==="harvest") loadHarvestTable();
 }
