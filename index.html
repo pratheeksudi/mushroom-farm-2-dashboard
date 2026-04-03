@@ -138,7 +138,7 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
 .chart-wrap{background:var(--panel);border:1px solid var(--border);padding:20px;margin-top:12px;position:relative}
 .chart-wrap canvas{max-height:280px}
 /* Shorter canvas for the square-wave chart — it only has 2 states */
-.chart-wrap.chart-sq canvas{max-height:150px}
+.chart-wrap.chart-sq canvas{max-height:180px}
 
 .chart-toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
 .chart-toolbar label{font-family:var(--font-mono);font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.12em}
@@ -335,10 +335,10 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
       <canvas id="chartMQ"></canvas>
     </div>
 
-    <!-- 4. Humidifier square-wave -->
+    <!-- 4. Humidifier square-wave — NOW REAL-TIME EVENTS ═══════════════════════════════════════ -->
     <div class="chart-wrap chart-sq" style="margin-top:12px;">
       <div class="chart-header">
-        <div class="chart-title">HUMIDIFIER STATE — square wave (ON = 1, OFF = 0)</div>
+        <div class="chart-title">HUMIDIFIER STATE — real-time square wave (ON = 1, OFF = 0) [events-based]</div>
         <div class="chart-stats">
           <div class="stat-pill green">Total ON <span id="stat_motorTotal">--</span></div>
           <div class="stat-pill amber">Cycles <span id="stat_motorCycles">--</span></div>
@@ -346,6 +346,9 @@ body::before{content:'';position:fixed;inset:0;background-image:url("data:image/
         </div>
       </div>
       <canvas id="chartMotor"></canvas>
+      <div style="font-family:var(--font-mono);font-size:.62rem;color:var(--muted);margin-top:8px;text-align:center;">
+        Data source: real-time motor ON/OFF events from esp32/motor/events/ — NOT 15-min averages
+      </div>
     </div>
 
     <!-- 5. Lux -->
@@ -634,12 +637,180 @@ function startListeners() {
 }
 
 /* ══════════════════════════════════════════════════════════
+   REAL-TIME MOTOR EVENT SQUARE WAVE BUILDER
+   ══════════════════════════════════════════════════════════
+   This fetches all motor ON/OFF events from Firebase and
+   reconstructs the precise timing square wave.
+   ══════════════════════════════════════════════════════════ */
+
+async function fetchMotorEventsForDate(dateStr) {
+  /*
+   * Fetch esp32/motor/eventIndex to get all event keys for the date.
+   * Each key is an epochMs timestamp in milliseconds.
+   * We filter for events within [dateStart, dateEnd] in UTC.
+   */
+  return new Promise((resolve) => {
+    db.ref("esp32/motor/eventIndex").once("value", snap => {
+      if (!snap.exists()) {
+        resolve([]);
+        return;
+      }
+
+      const allEvents = snap.val();
+      const keys = Object.keys(allEvents);
+
+      // Parse the selected date to get start/end of day (UTC)
+      const [y, m, d] = dateStr.split('-');
+      const dayStart = new Date(y, m - 1, d);
+      const dayEnd   = new Date(y, m - 1, d + 1);
+      const msStart  = dayStart.getTime();
+      const msEnd    = dayEnd.getTime();
+
+      // Filter events for this date
+      const dayEvents = [];
+      keys.forEach(key => {
+        const ms = parseInt(key, 10);
+        if (!isNaN(ms) && ms >= msStart && ms < msEnd) {
+          const evt = allEvents[key];
+          dayEvents.push({
+            epochMs: ms,
+            state: evt.state,
+            ts: evt.ts
+          });
+        }
+      });
+
+      // Sort by timestamp
+      dayEvents.sort((a, b) => a.epochMs - b.epochMs);
+      resolve(dayEvents);
+    });
+  });
+}
+
+function buildSquareWaveFromEvents(events, dateStr) {
+  /*
+   * Build an array of {time, state} transitions for the square wave.
+   * Also compute total ON time and cycle count.
+   *
+   * Algorithm:
+   *   - For each event, record the transition point
+   *   - State alternates ON/OFF based on event data
+   *   - Interpolate the square wave across the entire 24h period
+   *     by inserting points at start-of-day and end-of-day
+   */
+
+  if (events.length === 0) {
+    // No events → return empty square wave
+    return { times: [], states: [], totalOnMs: 0, cycleCount: 0 };
+  }
+
+  const [y, m, d] = dateStr.split('-');
+  const dayStart = new Date(y, m - 1, d).getTime();
+  const dayEnd   = new Date(y, m - 1, d + 1).getTime();
+
+  // Assume the motor started OFF at the beginning of the day
+  // (unless the first event says otherwise)
+  const transitions = [];
+  let lastState = false; // starts OFF
+
+  events.forEach((evt, idx) => {
+    const isOn = evt.state === "ON";
+    transitions.push({
+      ms: evt.epochMs,
+      state: isOn
+    });
+    lastState = isOn;
+  });
+
+  // Compute total ON time and cycle count
+  let totalOnMs = 0;
+  let cycleCount = 0;
+  let wasOn = false;
+
+  transitions.forEach((trans, idx) => {
+    const nextMs = idx + 1 < transitions.length ? transitions[idx + 1].ms : dayEnd;
+    const durationMs = nextMs - trans.ms;
+
+    if (trans.state) {
+      totalOnMs += durationMs;
+      if (!wasOn) cycleCount++; // new ON cycle starting
+    }
+    wasOn = trans.state;
+  });
+
+  // If still ON at end of day, it contributes to ON time
+  if (lastState) {
+    totalOnMs += (dayEnd - transitions[transitions.length - 1].ms);
+  }
+
+  return {
+    transitions,
+    dayStart,
+    dayEnd,
+    totalOnMs,
+    cycleCount
+  };
+}
+
+function formatSquareWaveChart(transitions, dayStart, dayEnd) {
+  /*
+   * Convert transitions into chart labels and data arrays.
+   * We create a point for each transition, plus interpolate
+   * the square wave across the day.
+   */
+
+  if (transitions.length === 0) {
+    // No data — return empty arrays
+    return { labels: ["00:00", "23:59"], squareData: [0, 0], durationData: [0, 0] };
+  }
+
+  const labels = [];
+  const squareData = [];
+  const durationData = [];
+
+  // Helper to format ms as HH:MM
+  const msToTime = (ms) => {
+    const d = new Date(ms);
+    const h = String(d.getHours()).padStart(2, '0');
+    const min = String(d.getMinutes()).padStart(2, '0');
+    return `${h}:${min}`;
+  };
+
+  // Start the day at OFF
+  labels.push(msToTime(dayStart));
+  squareData.push(0);
+  durationData.push(0);
+
+  // Add each transition
+  transitions.forEach((trans) => {
+    const time = msToTime(trans.ms);
+    labels.push(time);
+    squareData.push(trans.state ? 1 : 0);
+    durationData.push(trans.state ? 120 : 0); // placeholder duration
+  });
+
+  // If the last transition was ON, extend to end of day
+  // If OFF, add the final OFF point at end of day
+  if (transitions.length > 0 && transitions[transitions.length - 1].state) {
+    labels.push(msToTime(dayEnd));
+    squareData.push(1);
+    durationData.push(0);
+  } else if (transitions.length > 0) {
+    // Already OFF, but add end-of-day marker
+    labels.push(msToTime(dayEnd));
+    squareData.push(0);
+    durationData.push(0);
+  }
+
+  return { labels, squareData, durationData };
+}
+
+/* ══════════════════════════════════════════════════════════
    CHARTS
    ══════════════════════════════════════════════════════════ */
 let chartTemp=null, chartHum=null, chartMQ=null, chartMotor=null, chartLux=null;
 let chartsInited = false;
 
-/* Shared axis / legend defaults */
 const _xAxis = {
   ticks:{ color:'#4a7a5a', font:{ family:'Share Tech Mono', size:10 }, maxRotation:45, autoSkip:true, maxTicksLimit:24 },
   grid:{ color:'#1e3327' }
@@ -674,44 +845,31 @@ function initCharts() {
   if (chartsInited) return;
   chartsInited = true;
 
-  /* Temperature */
   chartTemp = _makeLineChart("chartTemp", [
     { label:"Inside °C",  data:[], borderColor:"#39ff8f", backgroundColor:"rgba(57,255,143,.08)",  tension:.3, pointRadius:2 },
     { label:"Outside °C", data:[], borderColor:"#ffb800", backgroundColor:"rgba(255,184,0,.05)",   tension:.3, pointRadius:2 }
   ]);
 
-  /* Humidity */
   chartHum = _makeLineChart("chartHum", [
     { label:"Inside % RH",  data:[], borderColor:"#00c9ff", backgroundColor:"rgba(0,201,255,.08)", tension:.3, pointRadius:2 },
     { label:"Outside % RH", data:[], borderColor:"#9b59b6", backgroundColor:"rgba(155,89,182,.05)",tension:.3, pointRadius:2 }
   ]);
 
-  /* MQ135 */
   chartMQ = _makeLineChart("chartMQ", [
     { label:"MQ135 Inside",  data:[], borderColor:"#ff6b6b", backgroundColor:"rgba(255,107,107,.08)", tension:.3, pointRadius:2 },
     { label:"MQ135 Outside", data:[], borderColor:"#ffa07a", backgroundColor:"rgba(255,160,122,.05)", tension:.3, pointRadius:2 }
   ]);
 
-  /* ── Humidifier square-wave chart ──────────────────────
-     Data source: motorOnS (0–900 seconds per 15-min window).
-
-     Two layers rendered on the same canvas:
-       Layer 1 (bar, back):  raw motorOnS value against right
-                              axis (0–900 s) — shows how long ON.
-       Layer 2 (line, front): binary 0/1 square wave against left
-                              axis — stepped:'before' creates the
-                              hard vertical edges of a real square wave.
-                              Filled area makes ON periods vivid.
-
-     Left Y-axis labels: "OFF" at 0, "ON" at 1.
-     Right Y-axis: 0 s → 900 s (one 15-min window max).
+  /* ── MOTOR SQUARE WAVE ────────────────────────────────
+     Real-time events-based square wave with two layers:
+     Layer 1 (bar): duration of each ON period
+     Layer 2 (step line): the square wave itself (0=OFF, 1=ON)
   ──────────────────────────────────────────────────────── */
   const motorCtx = document.getElementById("chartMotor").getContext("2d");
   chartMotor = new Chart(motorCtx, {
     data: {
       labels: [],
       datasets: [
-        /* Layer 1 — bar: raw seconds, muted fill, right axis */
         {
           type: 'bar',
           label: 'ON duration (s)',
@@ -724,7 +882,6 @@ function initCharts() {
           barPercentage: 0.9,
           categoryPercentage: 1.0
         },
-        /* Layer 2 — step line: square wave, left axis */
         {
           type: 'line',
           label: 'State (ON=1 / OFF=0)',
@@ -738,7 +895,7 @@ function initCharts() {
           pointBorderColor:     '#0a0f0d',
           pointBorderWidth:     1.5,
           fill:    true,
-          stepped: 'before',   /* ← produces the square wave */
+          stepped: 'before',
           tension: 0,
           yAxisID: 'yLeft',
           order: 1
@@ -754,7 +911,7 @@ function initCharts() {
           callbacks: {
             label: ctx => {
               if (ctx.dataset.type === 'bar')
-                return `  ON: ${ctx.parsed.y}s / 900s`;
+                return `  ON: ${ctx.parsed.y}s`;
               return `  State: ${ctx.parsed.y === 1 ? '🟢 ON' : '🔴 OFF'}`;
             }
           }
@@ -762,7 +919,6 @@ function initCharts() {
       },
       scales: {
         x: _xAxis,
-        /* Left Y: binary 0/1 labelled OFF/ON */
         yLeft: {
           type: 'linear',
           position: 'left',
@@ -776,12 +932,11 @@ function initCharts() {
           },
           grid: { color:'#1e3327' }
         },
-        /* Right Y: raw seconds per window */
         yRight: {
           type: 'linear',
           position: 'right',
           min: 0,
-          max: 900,
+          max: 3600,
           ticks: {
             color: '#2a4a3a',
             font: { family:'Share Tech Mono', size:9 },
@@ -793,7 +948,6 @@ function initCharts() {
     }
   });
 
-  /* Lux — standalone, yellow/amber theme, filled */
   chartLux = _makeLineChart("chartLux", [
     {
       label: 'Light (lux)',
@@ -814,7 +968,6 @@ function initCharts() {
   });
 }
 
-/* ── STAT HELPERS ────────────────────────────────────────── */
 function _avg(arr) {
   const v = arr.filter(x => x !== null && x !== undefined && !isNaN(x));
   return v.length ? v.reduce((a,b)=>a+b,0)/v.length : null;
@@ -826,45 +979,24 @@ function _fmtS(s) {
   return Math.floor(s/60)+'m '+String(s%60).padStart(2,'0')+'s';
 }
 
-function computeAndDisplayStats(tIn, tOut, hIn, hOut, mqIn, mqOut, motorOnSArr, luxArr) {
-  /* Temp / hum / mq averages */
-  setText("stat_tInAvg",   _sf(_avg(tIn)));
-  setText("stat_tOutAvg",  _sf(_avg(tOut)));
-  setText("stat_hInAvg",   _sf(_avg(hIn)));
-  setText("stat_hOutAvg",  _sf(_avg(hOut)));
-  setText("stat_mqInAvg",  _sf(_avg(mqIn),  0));
-  setText("stat_mqOutAvg", _sf(_avg(mqOut), 0));
-
-  /* Motor stats */
-  const valid  = motorOnSArr.filter(v => v !== null);
-  const totalS = valid.reduce((a,b)=>a+b, 0);
-  let cycles = 0, wasOn = false;
-  valid.forEach(v => { const on = v>0; if(on&&!wasOn) cycles++; wasOn=on; });
-  const avgRun = cycles>0 ? Math.round(totalS/cycles) : null;
-  setText("stat_motorTotal",  _fmtS(totalS));
-  setText("stat_motorCycles", cycles>0 ? cycles : '--');
-  setText("stat_motorAvgRun", _fmtS(avgRun));
-
-  /* Lux stats */
-  const vLux   = luxArr.filter(v=>v!==null&&!isNaN(v));
-  const maxLux = vLux.length ? Math.round(Math.max(...vLux)) : null;
-  setText("stat_luxMax", maxLux!==null ? maxLux : '--');
-  setText("stat_luxAvg", _sf(_avg(luxArr), 0));
-}
-
-/* ── LOAD CHART DATA ──────────────────────────────────── */
-function loadChartData() {
+async function loadChartData() {
   const dateStr = document.getElementById("chartDate").value;
   if (!dateStr) { alert("Select a date first"); return; }
 
+  // Load sensor data from production logs (same as before)
   db.ref("esp32/logs/" + dateStr).once("value", snap => {
-    if (!snap.exists()) { alert("No data for " + dateStr); return; }
+    if (!snap.exists()) {
+      alert("No sensor data for " + dateStr);
+      // Still try to load motor events
+      loadMotorEventsChart(dateStr);
+      return;
+    }
 
     const raw  = snap.val();
     const keys = Object.keys(raw).sort();
 
     const labels=[], tIn=[], tOut=[], hIn=[], hOut=[];
-    const mqIn=[], mqOut=[], motorOnSArr=[], luxArr=[];
+    const mqIn=[], mqOut=[], luxArr=[];
 
     keys.forEach(k => {
       const r = raw[k];
@@ -875,19 +1007,9 @@ function loadChartData() {
       hOut.push(r.humOut  ?? null);
       mqIn.push(r.mqIn    ?? null);
       mqOut.push(r.mqOut  ?? null);
-      motorOnSArr.push(r.motorOnS ?? null);
       luxArr.push(r.lux   ?? null);
     });
 
-    /*
-     * Square wave layer:
-     *   1 = was ON for any part of the 15-min window (motorOnS > 0)
-     *   0 = fully OFF the whole window (motorOnS === 0)
-     *  null = no data logged for that slot
-     */
-    const motorSquare = motorOnSArr.map(v => v === null ? null : (v > 0 ? 1 : 0));
-
-    /* Update standard charts */
     const upd = (chart, lbl, ...ds) => {
       chart.data.labels = lbl;
       ds.forEach((d,i) => chart.data.datasets[i].data = d);
@@ -898,14 +1020,49 @@ function loadChartData() {
     upd(chartMQ,   labels, mqIn, mqOut);
     upd(chartLux,  labels, luxArr);
 
-    /* Motor chart: dataset[0] = bar (raw s), dataset[1] = square wave */
-    chartMotor.data.labels                = labels;
-    chartMotor.data.datasets[0].data      = motorOnSArr;  // bar
-    chartMotor.data.datasets[1].data      = motorSquare;  // step line
-    chartMotor.update();
-
-    computeAndDisplayStats(tIn, tOut, hIn, hOut, mqIn, mqOut, motorOnSArr, luxArr);
+    computeSensorStats(tIn, tOut, hIn, hOut, mqIn, mqOut, luxArr);
   });
+
+  // Load motor events separately (real-time, not from production logs)
+  loadMotorEventsChart(dateStr);
+}
+
+async function loadMotorEventsChart(dateStr) {
+  /*
+   * Fetch motor events for the selected date and render
+   * the real-time square wave chart.
+   */
+  const events = await fetchMotorEventsForDate(dateStr);
+  const { transitions, dayStart, dayEnd, totalOnMs, cycleCount } = buildSquareWaveFromEvents(events, dateStr);
+  const { labels, squareData, durationData } = formatSquareWaveChart(transitions, dayStart, dayEnd);
+
+  // Update motor chart
+  chartMotor.data.labels = labels;
+  chartMotor.data.datasets[0].data = durationData;  // bar: durations
+  chartMotor.data.datasets[1].data = squareData;    // line: state
+  chartMotor.update();
+
+  // Update motor stats
+  const totalSec = Math.round(totalOnMs / 1000);
+  const avgRun = cycleCount > 0 ? Math.round(totalSec / cycleCount) : null;
+
+  setText("stat_motorTotal",  _fmtS(totalSec));
+  setText("stat_motorCycles", cycleCount > 0 ? cycleCount : '--');
+  setText("stat_motorAvgRun", _fmtS(avgRun));
+}
+
+function computeSensorStats(tIn, tOut, hIn, hOut, mqIn, mqOut, luxArr) {
+  setText("stat_tInAvg",   _sf(_avg(tIn)));
+  setText("stat_tOutAvg",  _sf(_avg(tOut)));
+  setText("stat_hInAvg",   _sf(_avg(hIn)));
+  setText("stat_hOutAvg",  _sf(_avg(hOut)));
+  setText("stat_mqInAvg",  _sf(_avg(mqIn),  0));
+  setText("stat_mqOutAvg", _sf(_avg(mqOut), 0));
+
+  const vLux   = luxArr.filter(v=>v!==null&&!isNaN(v));
+  const maxLux = vLux.length ? Math.round(Math.max(...vLux)) : null;
+  setText("stat_luxMax", maxLux!==null ? maxLux : '--');
+  setText("stat_luxAvg", _sf(_avg(luxArr), 0));
 }
 
 /* ══════════════════════════════════════════════════════════
