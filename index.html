@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mushroom Farm Dashboard</title>
+<title>Mushroom Farm Dashboard v4.3</title>
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
@@ -681,58 +681,70 @@ function startMotorEventListener(dateStr) {
   stopMotorEventListener();
   motorListenerDate = dateStr;
 
-  /* Compute day boundaries (local time, same as ESP32 IST midnight) */
+  /*
+   * Compute day boundaries as UNIX milliseconds.
+   *
+   * The ESP32 stores epochMs = epoch * 1000  (13-digit UNIX ms).
+   * We compute IST midnight by treating the date string as local
+   * time — JS Date(y,m-1,d) uses the browser's local timezone.
+   * Since the ESP32 also uses IST (UTC+5:30), this matches as
+   * long as the browser is also in IST.  For a cross-timezone
+   * deployment you would send a fixed IST offset, but for a
+   * home farm in India this is fine.
+   */
   const [y, m, d] = dateStr.split('-').map(Number);
-  const dayStart  = new Date(y, m - 1, d).getTime();
-  const dayEnd    = new Date(y, m - 1, d + 1).getTime();
+  const dayStart  = new Date(y, m - 1, d).getTime();         // ms
+  const dayEnd    = new Date(y, m - 1, d + 1).getTime();     // ms
 
   /*
-   * Query events for this date.
-   * The key is epochMs as a numeric string — Firebase orders
-   * children by key by default, and epochMs strings sort
-   * correctly because they are all the same length (13 digits).
+   * Use orderByKey with string boundaries.
+   * The Firebase key is the epochMs stored as a decimal string.
+   * Keys are ordered lexicographically, but because all valid
+   * UNIX-ms keys are 13 digits (until year 2286) they sort
+   * correctly.  This also avoids requiring a ".indexOn" rule
+   * for the epochMs child field.
    */
   motorEventRef = db.ref("esp32/Motor/events")
-    .orderByChild("epochMs")
-    .startAt(dayStart)
-    .endAt(dayEnd - 1);
+    .orderByKey()
+    .startAt(String(dayStart))
+    .endAt(String(dayEnd - 1));
 
   /*
-   * Step 1: Load all existing events via .once() so we have
-   * a complete baseline before attaching the live listener.
-   * This avoids the child_added "initial dump" problem.
+   * Step 1: load existing events via .once() to build the
+   * baseline cache without triggering child_added for old data.
    */
   motorEventRef.once("value", snap => {
     motorEventsCache = {};
     if (snap.exists()) {
       snap.forEach(child => {
-        const v = child.val();
-        motorEventsCache[String(v.epochMs || child.key)] = v;
+        const v   = child.val();
+        /* Normalise: use the Firebase key as the canonical id */
+        const key = child.key;
+        /* Ensure epochMs is populated (back-fill from key if needed) */
+        if (!v.epochMs) v.epochMs = Number(key);
+        motorEventsCache[key] = v;
       });
     }
-    console.log(`Motor events loaded for ${dateStr}: ${Object.keys(motorEventsCache).length} events`);
+    console.log(`Motor events loaded for ${dateStr}: ${Object.keys(motorEventsCache).length} events  dayStart=${dayStart} dayEnd=${dayEnd}`);
     motorLoadComplete = true;
     rebuildMotorChart(dateStr);
 
     /*
-     * Step 2: Now attach child_added for real-time updates.
-     * Since we already loaded everything, child_added will only
-     * fire for NEW events written after this point.
-     * We use .limitToLast(1) pattern to avoid re-firing old ones,
-     * but more reliably we track which keys we've seen.
+     * Step 2: attach child_added for live updates.
+     * child_added fires for every existing child first, then for
+     * new ones.  Because we already populated the cache above,
+     * duplicates are silently skipped via the key check.
      */
     motorEventRef.on("child_added", snap => {
-      if (!motorLoadComplete) return; // safety guard
-      const v   = snap.val();
-      const key = String(v.epochMs || snap.key);
+      if (!motorLoadComplete) return;
+      const key = snap.key;
+      if (motorEventsCache[key]) return; /* already loaded */
 
-      /* Skip if already in cache (initial dump race condition guard) */
-      if (motorEventsCache[key]) return;
-
+      const v = snap.val();
+      if (!v.epochMs) v.epochMs = Number(key);
       motorEventsCache[key] = v;
-      console.log(`New motor event received: ${v.state} @ ${v.ts}`);
+      console.log(`Live motor event: ${v.state} @ ${v.ts}  key=${key}`);
 
-      /* Only redraw if this event belongs to the currently shown date */
       if (motorListenerDate === dateStr) {
         rebuildMotorChart(dateStr);
       }
